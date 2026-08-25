@@ -1,0 +1,53 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+      - "*.x"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: true
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The probe and runner tests are part of the suite, not a separate
+      # category, so the corpus has to be here for `pytest` to mean anything.
+      #
+      # The alternative — letting those tests skip themselves when the loader is
+      # absent — is the failure this whole project is about: a mechanism that is
+      # correct and silently not running, reporting green.
+      - name: Checkout prism-parity
+        uses: actions/checkout@v4
+        with:
+          repository: Particle-Academy/prism-parity
+          path: .parity
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # The package has ZERO runtime dependencies on purpose, so the only thing
+      # installed here beyond the package itself is the test tooling.
+      - name: Install
+        run: python -m pip install --quiet -e ".[dev]"
+
+      - name: Install the conformance corpus
+        run: python -m pip install --quiet ./.parity/loaders/py
+
+      # -ra so skips and their reasons are always printed. A skip nobody sees
+      # becomes permanent silently.
+      - name: Tests
+        run: python -m pytest -ra

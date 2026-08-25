@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prism-ai"
+version = "0.1.0"
+description = "A unified API layer over LLM providers — Python port of the Prism text capability."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Particle Academy" }]
+keywords = ["llm", "openai", "prism", "ai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "mypy>=1.11", "ruff>=0.6"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prism"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "conformance", "tests"]
+# Prose, not source. Ruff would collapse the README's chained-builder examples
+# onto one line, which is exactly the shape they exist to show.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N", "RUF"]
+ignore = [
+    # `Tool.format` / schema `format` mirror the reference field names.
+    "A003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["src", "conformance", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# `-ra` so skips and their reasons are always printed. A skip nobody sees is a
+# suite that quietly shrank.
+addopts = "-q -ra"
+# The conformance runner is test support outside src/, and the tests import it.
+pythonpath = ["."]
