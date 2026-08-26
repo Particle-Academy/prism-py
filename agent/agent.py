@@ -53,6 +53,13 @@ def _provider_available() -> bool:
 # Long enough for a real suite, bounded so a hung child cannot wedge the lane.
 RUN_TIMEOUT = int(os.environ.get("PRISM_AGENT_RUN_TIMEOUT", "300"))
 
+# Where the shared conformance corpus lives. CI checks prism-parity out into
+# .parity/; in the envelope it is already a sibling repo, so that is the
+# default. Either way the corpus is ONE artifact with one digest - a run
+# against a different copy is not comparable, which is why this is a path and
+# not a bundled copy.
+PARITY_ROOT = os.environ.get("PRISM_PARITY_ROOT", "../prism-parity")
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -158,7 +165,7 @@ def describe_port(_: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_conformance(_: dict[str, Any]) -> dict[str, Any]:
-    result = _run([sys.executable, "conformance/runner.py"])
+    result = _run([sys.executable, "conformance/runner.py", "--root", PARITY_ROOT])
 
     # The runner writes the report document as JSON on stdout and nothing
     # else. Returned as it comes: the corpus contract is versioned and shared,
