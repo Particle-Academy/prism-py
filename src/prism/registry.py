@@ -45,6 +45,12 @@ def _default_factory(key: str) -> ProviderFactory | None:
     Deferred rather than imported at module level so the builder and the
     providers do not have to import each other at start-up.
     """
+    if key == "anthropic":
+        from prism.providers.anthropic.provider import Anthropic
+
+        register_provider("anthropic", Anthropic)
+        return Anthropic
+
     if key == "openai":
         from prism.providers.openai.provider import OpenAI
 
