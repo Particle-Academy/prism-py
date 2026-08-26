@@ -89,6 +89,46 @@ def status(_: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def describe_port(_: dict[str, Any]) -> dict[str, Any]:
+    """What this port actually implements, read from disk rather than remembered.
+
+    The agent was confidently wrong about a provider it had never had, because
+    nothing let it check - it reasoned from the question it was asked instead
+    of from the port it lives in.
+    """
+    providers_dir = ROOT / "src" / "prism" / "providers"
+    providers = (
+        sorted(
+            entry.name
+            for entry in providers_dir.iterdir()
+            if entry.is_dir() and not entry.name.startswith("__")
+        )
+        if providers_dir.is_dir()
+        else []
+    )
+
+    modules = (
+        sorted(
+            path.relative_to(ROOT / "src" / "prism").as_posix()
+            for path in (ROOT / "src" / "prism").rglob("*.py")
+            if "__pycache__" not in path.parts
+        )
+        if (ROOT / "src" / "prism").is_dir()
+        else []
+    )
+
+    return {
+        "language": LANGUAGE,
+        "providers_implemented": providers,
+        "provider_count": len(providers),
+        "modules": modules,
+        "note": (
+            "A provider absent from providers_implemented is not implemented here at all - "
+            "not merely missing a field."
+        ),
+    }
+
+
 def run_conformance(_: dict[str, Any]) -> dict[str, Any]:
     result = _run([sys.executable, "conformance/runner.py"])
 
@@ -176,6 +216,14 @@ TOOLS: dict[str, dict[str, Any]] = {
         ),
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
         "handler": status,
+    },
+    "describe_port": {
+        "description": (
+            "What this port actually implements - providers and modules. Read from the source, "
+            "not remembered. Call this before reasoning about whether a feature exists here."
+        ),
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "handler": describe_port,
     },
     "run_conformance": {
         "description": (
