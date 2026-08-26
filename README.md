@@ -18,6 +18,11 @@ response = (
 print(response.text)
 ```
 
+> **Working on this package?** Read **[`AGENTS.md`](AGENTS.md)** first — the boundary
+> this package has to hold, the gates that must be green, and the traps that have
+> already caught someone.
+> `@link AGENTS.md`
+
 ## Scope
 
 One vertical slice, deliberately: the entry point, the pending-request builder,
