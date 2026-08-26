@@ -24,14 +24,72 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from prism import Prism
 from prism.registry import resolve_provider
 
+
+def _load_env_file(path: Path) -> None:
+    """Load KEY=value pairs from a .env, without a dependency.
+
+    The agent runs as a supervised process, and a supervised process inherits
+    the supervisor's environment - not the workspace's. So a key sitting in a
+    .env that every other app here reads was invisible to this one, and the
+    agent reported that it could not reason while the credential was on disk
+    beside it.
+
+    Anything ALREADY in the environment wins: an explicit export is a
+    deliberate override and must not be silently replaced by a file.
+    """
+    try:
+        contents = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+
+    for line in contents.splitlines():
+        trimmed = line.strip()
+
+        if not trimmed or trimmed.startswith("#") or "=" not in trimmed:
+            continue
+
+        key, _, value = trimmed.partition("=")
+        key, value = key.strip(), value.strip()
+
+        if not key or key in os.environ:
+            continue
+
+        # Surrounding quotes are stripped; nothing else is interpreted. A .env
+        # is not a shell script, and treating it like one is how a value
+        # containing a $ becomes something else.
+        if len(value) > 1 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+
+        os.environ[key] = value
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+# The repo's own .env, then the envelope's. Loaded BEFORE PROVIDER and MODEL
+# are read below, because those defaults are only correct if the file has
+# already had its say.
+_load_env_file(ROOT / ".env")
+_load_env_file(ROOT.parent.parent / ".env")
+
 LANGUAGE = "py"
 # Provider and model are BOTH configurable, and the provider is checked
 # against what this port can actually route to. Without that, pointing
 # PRISM_AGENT_MODEL at a Claude model would send a Claude model name to OpenAI
 # and fail at the API with an error about the model rather than the provider -
 # the confusing kind, that sends you looking in the wrong place.
-PROVIDER = os.environ.get("PRISM_AGENT_PROVIDER", "openai")
-MODEL = os.environ.get("PRISM_AGENT_MODEL", "gpt-4.1-mini")
+PROVIDER = os.environ.get("PRISM_AGENT_PROVIDER", "anthropic")
+MODEL = os.environ.get("PRISM_AGENT_MODEL", "claude-sonnet-4-5")
+
+
+def _api_key_var() -> str:
+    """The env var this provider reads its key from.
+
+    Derived rather than hardcoded: the provider became configurable and the key
+    check did not follow it, so switching to Anthropic left the agent reporting
+    can_reason from whether an OPENAI key happened to be set. Both ports name
+    their key <PROVIDER>_API_KEY, so the name follows the provider.
+    """
+    return f"{PROVIDER.upper()}_API_KEY"
 
 
 def _provider_available() -> bool:
@@ -59,8 +117,6 @@ RUN_TIMEOUT = int(os.environ.get("PRISM_AGENT_RUN_TIMEOUT", "300"))
 # against a different copy is not comparable, which is why this is a path and
 # not a bundled copy.
 PARITY_ROOT = os.environ.get("PRISM_PARITY_ROOT", "../prism-parity")
-
-ROOT = Path(__file__).resolve().parents[1]
 
 
 def _port_version() -> str | None:
@@ -120,7 +176,7 @@ def status(_: dict[str, Any]) -> dict[str, Any]:
         "provider_available": _provider_available(),
         # Named, never returned. Whether a key EXISTS is a status question;
         # what it is never is.
-        "can_reason": bool(os.environ.get("OPENAI_API_KEY")),
+        "can_reason": bool(os.environ.get(_api_key_var())),
     }
 
 
@@ -216,10 +272,10 @@ def explain(arguments: dict[str, Any]) -> dict[str, Any]:
             ),
         }
 
-    if not os.environ.get("OPENAI_API_KEY"):
+    if not os.environ.get(_api_key_var()):
         # Say so rather than calling with an empty bearer token and returning
         # whatever the provider says about it.
-        return {"ok": False, "reason": "no OPENAI_API_KEY set for this agent - it cannot reason"}
+        return {"ok": False, "reason": f"no {_api_key_var()} set for this agent - it cannot reason"}
 
     parts = [f"Subject: {subject}"]
     for label in ("expected", "actual"):
