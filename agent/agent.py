@@ -22,9 +22,33 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from prism import Prism
+from prism.registry import resolve_provider
 
 LANGUAGE = "py"
+# Provider and model are BOTH configurable, and the provider is checked
+# against what this port can actually route to. Without that, pointing
+# PRISM_AGENT_MODEL at a Claude model would send a Claude model name to OpenAI
+# and fail at the API with an error about the model rather than the provider -
+# the confusing kind, that sends you looking in the wrong place.
+PROVIDER = os.environ.get("PRISM_AGENT_PROVIDER", "openai")
 MODEL = os.environ.get("PRISM_AGENT_MODEL", "gpt-4.1-mini")
+
+
+def _provider_available() -> bool:
+    """Whether this port can route to the configured provider.
+
+    Asked by resolving rather than by listing, because this port registers
+    providers LAZILY - there is no materialised set to enumerate, and so no
+    registered_providers() to call. The TypeScript port registers eagerly and
+    exports exactly that. Same question, answerable in one port and not the
+    other.
+    """
+    try:
+        resolve_provider(PROVIDER)
+    except Exception:
+        return False
+    return True
+
 
 # Long enough for a real suite, bounded so a hung child cannot wedge the lane.
 RUN_TIMEOUT = int(os.environ.get("PRISM_AGENT_RUN_TIMEOUT", "300"))
@@ -82,7 +106,11 @@ def status(_: dict[str, Any]) -> dict[str, Any]:
         "language": LANGUAGE,
         "agent": "prism.py",
         "port_version": _port_version(),
+        "provider": PROVIDER,
         "model": MODEL,
+        # A configured provider this port cannot route to is a broken lane that
+        # would otherwise look healthy until the first billable call.
+        "provider_available": _provider_available(),
         # Named, never returned. Whether a key EXISTS is a status question;
         # what it is never is.
         "can_reason": bool(os.environ.get("OPENAI_API_KEY")),
@@ -172,6 +200,15 @@ SYSTEM_PROMPT = (
 def explain(arguments: dict[str, Any]) -> dict[str, Any]:
     subject = arguments.get("subject", "")
 
+    if not _provider_available():
+        return {
+            "ok": False,
+            "reason": (
+                f'this port does not implement "{PROVIDER}". '
+                "Set PRISM_AGENT_PROVIDER to one it does, or add the provider to the port."
+            ),
+        }
+
     if not os.environ.get("OPENAI_API_KEY"):
         # Say so rather than calling with an empty bearer token and returning
         # whatever the provider says about it.
@@ -186,7 +223,7 @@ def explain(arguments: dict[str, Any]) -> dict[str, Any]:
 
     response = (
         Prism.text()
-        .using("openai", MODEL)
+        .using(PROVIDER, MODEL)
         .with_system_prompt(SYSTEM_PROMPT)
         .with_prompt("\n\n".join(parts))
         .with_max_tokens(900)

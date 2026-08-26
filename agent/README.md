@@ -20,6 +20,7 @@ empty bearer token.
 | Variable | Default |
 |---|---|
 | `PRISM_AGENT_PORT` | `7412` |
+| `PRISM_AGENT_PROVIDER` | `openai` |
 | `PRISM_AGENT_MODEL` | `gpt-4.1-mini` |
 | `PRISM_AGENT_RUN_TIMEOUT` | `300` (seconds) |
 
@@ -51,3 +52,14 @@ Standard library only, like the package it lives in.
 This agent runs the test suite and spends tokens. That is remote code
 execution wearing a friendly name, and it has no business being reachable
 from anywhere but this machine.
+
+## Why it is not on Claude
+
+`PRISM_AGENT_PROVIDER` is checked against what this port can actually route to,
+and today that is **OpenAI only**. Pointing it at `anthropic` makes `status`
+report `provider_available: false` and `explain` refuse by name, rather than
+sending a Claude model id to OpenAI and failing at the API with an error about
+the model — the confusing kind, that sends you looking in the wrong place.
+
+Moving this agent to Claude is not a setting. It needs an Anthropic provider
+in the port itself, and then it is a setting.
