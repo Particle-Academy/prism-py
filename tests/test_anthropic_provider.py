@@ -38,6 +38,7 @@ def _ok_body() -> dict[str, Any]:
 
 def _sent_body(transport: RecordingTransport) -> dict[str, Any]:
     assert transport.sent is not None
+    assert transport.sent.body is not None
     decoded: dict[str, Any] = json.loads(transport.sent.body.decode("utf-8"))
     return decoded
 
