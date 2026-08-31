@@ -31,6 +31,7 @@ class ErrorCode(str, Enum):
     UNREADABLE_INPUT_FILE = "unreadable_input_file"
     NO_IMAGE_PROMPT = "no_image_prompt"
     NO_MODERATION_INPUT = "no_moderation_input"
+    UNREADABLE_MEDIA_FILE = "unreadable_media_file"
 
 
 class PrismError(Exception):

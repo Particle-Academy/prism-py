@@ -50,7 +50,9 @@ def test_the_prompt_is_posted_and_the_image_comes_back() -> None:
 
     image = response.first_image()
     assert image is not None
-    assert image.base64 == "aGk="
+    # `base64()` is a method now that GeneratedImage extends Media: the base
+    # computes it lazily from raw content when only bytes are known.
+    assert image.base64() == "aGk="
     assert image.url is None
 
 
