@@ -143,6 +143,4 @@ def test_an_unreadable_input_file_names_the_path() -> None:
     # Escaped: the `.` is a path separator here, not a regex wildcard, and an
     # unescaped pattern would pass against a message naming a different file.
     with pytest.raises(PrismError, match=re.escape("does/not/exist.txt")):
-        Prism.embeddings().using("openai", "text-embedding-3-small").from_file(
-            "does/not/exist.txt"
-        )
+        Prism.embeddings().using("openai", "text-embedding-3-small").from_file("does/not/exist.txt")

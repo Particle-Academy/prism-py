@@ -91,9 +91,7 @@ class Media:
             ) from error
 
         if not content:
-            raise PrismError(
-                ErrorCode.UNREADABLE_MEDIA_FILE, f"The media file [{path}] is empty."
-            )
+            raise PrismError(ErrorCode.UNREADABLE_MEDIA_FILE, f"The media file [{path}] is empty.")
 
         media = cls()
         media._raw_content = content

@@ -201,7 +201,6 @@ class Anthropic(Provider):
         return decoded
 
 
-
 def _schema_instruction(request: StructuredRequest) -> str:
     """The message that asks for JSON and nothing else.
 

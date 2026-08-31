@@ -81,7 +81,9 @@ def test_a_model_that_cannot_do_structured_output_is_refused() -> None:
     with pytest.raises(PrismError, match="not supported for o1-mini"):
         (
             Prism.structured()
-            .using("openai", "o1-mini", {"api_key": "sk-test", "transport": RecordingTransport("{}")})
+            .using(
+                "openai", "o1-mini", {"api_key": "sk-test", "transport": RecordingTransport("{}")}
+            )
             .with_schema(SCHEMA)
             .with_prompt("Who?")
             .as_structured()
@@ -93,7 +95,9 @@ def test_a_fine_tune_inherits_its_base_model_capability() -> None:
 
     (
         Prism.structured()
-        .using("openai", "ft:gpt-4o:acme:tuned:abc123", {"api_key": "sk-test", "transport": transport})
+        .using(
+            "openai", "ft:gpt-4o:acme:tuned:abc123", {"api_key": "sk-test", "transport": transport}
+        )
         .with_schema(SCHEMA)
         .with_prompt("Who?")
         .as_structured()
@@ -121,7 +125,9 @@ def test_an_explicit_mode_beats_the_resolver() -> None:
 
 def test_a_structured_request_without_a_schema_is_refused() -> None:
     with pytest.raises(PrismError, match="needs a schema"):
-        Prism.structured().using("openai", "gpt-4o", {"api_key": "sk-test"}).with_prompt("Who?").to_request()
+        Prism.structured().using("openai", "gpt-4o", {"api_key": "sk-test"}).with_prompt(
+            "Who?"
+        ).to_request()
 
 
 def test_the_text_survives_when_the_answer_is_not_an_object() -> None:

@@ -52,7 +52,9 @@ def test_a_payload_split_across_chunks_is_reassembled() -> None:
     # not align its writes to the reader's convenience, and this split lands
     # mid-JSON -- the case a line-promising transport would handle internally
     # where no test could reach it.
-    assert list(sse_data(['data: {"type":"resp', 'onse.created"}\n\n'])) == ['{"type":"response.created"}']
+    assert list(sse_data(['data: {"type":"resp', 'onse.created"}\n\n'])) == [
+        '{"type":"response.created"}'
+    ]
 
 
 def test_the_done_sentinel_is_dropped_rather_than_handed_on() -> None:

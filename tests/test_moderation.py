@@ -15,8 +15,16 @@ OK = {
     "id": "modr_1",
     "model": "omni-moderation-latest",
     "results": [
-        {"flagged": False, "categories": {"violence": False}, "category_scores": {"violence": 0.01}},
-        {"flagged": True, "categories": {"violence": True, "hate": False}, "category_scores": {"violence": 0.98}},
+        {
+            "flagged": False,
+            "categories": {"violence": False},
+            "category_scores": {"violence": 0.01},
+        },
+        {
+            "flagged": True,
+            "categories": {"violence": True, "hate": False},
+            "category_scores": {"violence": 0.98},
+        },
     ],
 }
 
