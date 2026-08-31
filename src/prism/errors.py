@@ -30,6 +30,7 @@ class ErrorCode(str, Enum):
     NO_EMBEDDING_INPUT = "no_embedding_input"
     UNREADABLE_INPUT_FILE = "unreadable_input_file"
     NO_IMAGE_PROMPT = "no_image_prompt"
+    NO_MODERATION_INPUT = "no_moderation_input"
 
 
 class PrismError(Exception):

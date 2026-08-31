@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from prism.embeddings.pending_request import EmbeddingsPendingRequest
 from prism.images.pending_request import ImagesPendingRequest
+from prism.moderation.pending_request import ModerationPendingRequest
 from prism.structured.pending_request import StructuredPendingRequest
 from prism.text.pending_request import PendingRequest
 
@@ -38,3 +39,8 @@ class Prism:
     def images() -> ImagesPendingRequest:
         """Begin an image generation."""
         return ImagesPendingRequest()
+
+    @staticmethod
+    def moderation() -> ModerationPendingRequest:
+        """Begin a moderation check."""
+        return ModerationPendingRequest()

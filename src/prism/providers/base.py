@@ -42,6 +42,15 @@ class Provider:
     def speech_to_text(self, request: Any) -> Any:
         self._unsupported("speech_to_text")
 
+    def fim(self, request: Any) -> Any:
+        self._unsupported("fim")
+
+    def batch(self, request: Any) -> Any:
+        self._unsupported("batch")
+
+    def upload_file(self, request: Any) -> Any:
+        self._unsupported("uploadFile")
+
     def stream(self, request: Any) -> Any:
         self._unsupported("stream")
 
