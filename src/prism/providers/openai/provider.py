@@ -13,6 +13,10 @@ from prism.http import DEFAULT_TIMEOUT, HttpRequest, Transport, UrllibTransport
 from prism.providers.base import Provider
 from prism.providers.openai.request_body import build_request_body
 from prism.providers.openai.response import parse_text_response
+from prism.providers.openai.structured_body import build_structured_body
+from prism.structured.from_text import structured_from_text_response
+from prism.structured.request import StructuredRequest
+from prism.structured.response import StructuredResponse
 from prism.text.request import Request
 from prism.text.response import Response
 
@@ -53,10 +57,24 @@ class OpenAI(Provider):
         self._transport: Transport = transport or UrllibTransport()
 
     def text(self, request: Request) -> Response:
-        if self.api_format != "responses":
-            self._unsupported(f"text via the {self.api_format} API")
+        return self._send(build_request_body(request), request, "text")
 
-        body = canonical.encode(build_request_body(request)).encode("utf-8")
+    def _send(
+        self,
+        payload: dict[str, Any],
+        request: Request,
+        action: str = "structured",
+    ) -> Response:
+        """One round trip, shared by every capability that posts to /responses.
+
+        Extracted so a structured call cannot drift from a text one: the
+        endpoint, the headers, the timeout and the error mapping are decided
+        once.
+        """
+        if self.api_format != "responses":
+            self._unsupported(f"{action} via the {self.api_format} API")
+
+        body = canonical.encode(payload).encode("utf-8")
         response = self._transport.send(
             HttpRequest(
                 method="POST",
@@ -78,6 +96,15 @@ class OpenAI(Provider):
             )
 
         return parse_text_response(request, decoded)
+
+    def structured(self, request: StructuredRequest) -> StructuredResponse:
+        """Structured output through the Responses API's schema format.
+
+        The reply is parsed by the TEXT parser and then given its structured
+        reading, so finish reasons, token-limit failures, usage and rate limits
+        behave identically on both paths by construction.
+        """
+        return structured_from_text_response(self._send(build_structured_body(request), request))
 
     # -- internals ---------------------------------------------------------
 

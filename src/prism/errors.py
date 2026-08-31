@@ -25,6 +25,8 @@ class ErrorCode(str, Enum):
     MALFORMED_TOOL_CALL_ARGUMENTS = "malformed_tool_call_arguments"
     UNKNOWN_MESSAGE_TYPE = "unknown_message_type"
     TOOL_LOOP_NOT_SUPPORTED = "tool_loop_not_supported"
+    MISSING_SCHEMA = "missing_schema"
+    UNSUPPORTED_STRUCTURED_MODEL = "unsupported_structured_model"
 
 
 class PrismError(Exception):

@@ -60,3 +60,21 @@ class Provider(str, Enum):
     PERPLEXITY = "perplexity"
     VERTEX = "vertex"
     Z = "z"
+
+
+class StructuredMode(Enum):
+    """How to ask a provider for structured output.
+
+    Without backing values, exactly as :class:`ToolChoice`: each provider decides
+    what a mode means on its own API, and an opaque member cannot be serialised
+    into a request body by accident.
+
+    ``AUTO`` lets the provider pick the strongest method the model supports.
+    ``JSON`` asks only for valid JSON. ``STRUCTURED`` demands the provider's
+    schema-enforcing mode and fails rather than degrading -- the one to choose
+    when a malformed answer would be worse than no answer.
+    """
+
+    AUTO = auto()
+    JSON = auto()
+    STRUCTURED = auto()

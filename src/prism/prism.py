@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from prism.structured.pending_request import StructuredPendingRequest
 from prism.text.pending_request import PendingRequest
 
 __all__ = ["Prism"]
@@ -20,3 +21,8 @@ class Prism:
     def text() -> PendingRequest:
         """Begin a text generation."""
         return PendingRequest()
+
+    @staticmethod
+    def structured() -> StructuredPendingRequest:
+        """Begin a generation that must come back shaped."""
+        return StructuredPendingRequest()
