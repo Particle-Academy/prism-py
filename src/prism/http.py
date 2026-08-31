@@ -9,13 +9,22 @@ a transport and never touch the network.
 from __future__ import annotations
 
 import codecs
+import secrets
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-__all__ = ["HttpRequest", "HttpResponse", "Transport", "UrllibTransport"]
+__all__ = [
+    "HttpRequest",
+    "HttpResponse",
+    "MultipartBody",
+    "MultipartFile",
+    "Transport",
+    "UrllibTransport",
+    "encode_multipart",
+]
 
 DEFAULT_TIMEOUT = 30.0
 
@@ -163,3 +172,73 @@ class UrllibStreamTransport:
                     yield text
         finally:
             response.close()
+
+
+@dataclass(frozen=True)
+class MultipartFile:
+    """One file part of a form upload."""
+
+    field: str
+    filename: str
+    content: bytes
+    content_type: str | None = None
+
+
+@dataclass(frozen=True)
+class MultipartBody:
+    """A form upload: named string fields, plus files."""
+
+    fields: dict[str, str] = field(default_factory=dict)
+    files: tuple[MultipartFile, ...] = ()
+
+
+#: The format's line ending. A bare LF is tolerated by some servers and
+#: rejected by others, and the failure is a rejected upload with no useful
+#: message, so it is spelled out once here rather than typed per line.
+CRLF = b"\r\n"
+
+
+def encode_multipart(body: MultipartBody) -> tuple[str, bytes]:
+    """Encode a form upload, returning its Content-Type and its bytes.
+
+    A FUNCTION rather than a transport, which is where this port diverges from
+    the TypeScript one. There, ``fetch`` owns the encoder and sets the boundary
+    itself, so a form has to be handed to the transport intact; here nothing in
+    the standard library encodes one for us, so we encode it and the existing
+    :class:`Transport` carries the result like any other body. That keeps the
+    transport protocol at one method, and keeps every test double already
+    written for it working unchanged.
+
+    The BOUNDARY is random per call. The format has no escaping: a boundary that
+    also appears inside a part silently splits the file, and the only defence is
+    picking one that will not. 32 hex characters from :mod:`secrets` is the
+    standard answer.
+    """
+    boundary = secrets.token_hex(16)
+    marker = f"--{boundary}".encode("ascii")
+    out = bytearray()
+
+    for name, value in body.fields.items():
+        out += marker + CRLF
+        out += f'Content-Disposition: form-data; name="{name}"'.encode()
+        out += CRLF + CRLF
+        out += value.encode("utf-8")
+        out += CRLF
+
+    for part in body.files:
+        out += marker + CRLF
+        out += (
+            f'Content-Disposition: form-data; name="{part.field}"; filename="{part.filename}"'
+        ).encode()
+        out += CRLF
+
+        if part.content_type is not None:
+            out += f"Content-Type: {part.content_type}".encode("ascii") + CRLF
+
+        out += CRLF
+        out += part.content
+        out += CRLF
+
+    out += marker + b"--" + CRLF
+
+    return f"multipart/form-data; boundary={boundary}", bytes(out)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from prism.audio.pending_request import AudioPendingRequest
 from prism.embeddings.pending_request import EmbeddingsPendingRequest
 from prism.images.pending_request import ImagesPendingRequest
 from prism.moderation.pending_request import ModerationPendingRequest
@@ -39,6 +40,11 @@ class Prism:
     def images() -> ImagesPendingRequest:
         """Begin an image generation."""
         return ImagesPendingRequest()
+
+    @staticmethod
+    def audio() -> AudioPendingRequest:
+        """Begin an audio request, in either direction."""
+        return AudioPendingRequest()
 
     @staticmethod
     def moderation() -> ModerationPendingRequest:

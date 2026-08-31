@@ -9,6 +9,8 @@ from typing import Any
 
 from prism import canonical
 from prism._php import data_get
+from prism.audio.request import SpeechToTextRequest, TextToSpeechRequest
+from prism.audio.response import AudioResponse, AudioTextResponse
 from prism.embeddings.request import EmbeddingsRequest
 from prism.embeddings.response import EmbeddingsResponse
 from prism.errors import PrismError
@@ -19,12 +21,19 @@ from prism.http import (
     Transport,
     UrllibStreamTransport,
     UrllibTransport,
+    encode_multipart,
 )
 from prism.images.request import ImagesRequest
 from prism.images.response import ImagesResponse
 from prism.moderation.request import ModerationRequest
 from prism.moderation.response import ModerationResponse
 from prism.providers.base import Provider
+from prism.providers.openai.audio import (
+    build_speech_body,
+    build_transcription_form,
+    parse_speech_response,
+    parse_transcription_response,
+)
 from prism.providers.openai.embeddings import build_embeddings_body, parse_embeddings_response
 from prism.providers.openai.images import build_images_body, parse_images_response
 from prism.providers.openai.moderation import build_moderation_body, parse_moderation_response
@@ -203,6 +212,73 @@ class OpenAI(Provider):
             )
 
         return parse_moderation_response(decoded, request.model)
+
+    def text_to_speech(self, request: TextToSpeechRequest) -> AudioResponse:
+        """Speech, returned as BYTES.
+
+        Nothing new is needed on the transport for this: :class:`HttpResponse`
+        already carries a ``bytes`` body, because ``urllib`` hands one over. The
+        TypeScript port needed a second transport here, since ``fetch`` decodes
+        to text; this one does not, which is the divergence rather than an
+        omission.
+
+        The ERROR path is still JSON, so a failure is decoded as such rather
+        than reported as an unreadable body.
+        """
+        body = canonical.encode(build_speech_body(request)).encode("utf-8")
+        response = self._transport.send(
+            HttpRequest(
+                method="POST",
+                url=f"{self.url}/audio/speech",
+                headers=self._headers(len(body)),
+                body=body,
+                timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+            )
+        )
+
+        if response.status >= 400:
+            decoded = self._decode(response.status, response.body)
+            raise PrismError.provider_response_error(
+                f"OpenAI error [{response.status}]: "
+                f"{data_get(decoded, 'error.message', 'unknown')}",
+                status=response.status,
+                body=response.body.decode("utf-8", errors="replace"),
+            )
+
+        return parse_speech_response(response.body, response.headers.get("content-type"), request)
+
+    def speech_to_text(self, request: SpeechToTextRequest) -> AudioTextResponse:
+        """A transcript, uploaded as multipart.
+
+        The only capability here that does not post JSON. The Content-Type
+        carries the boundary the encoder chose, so it REPLACES the JSON one
+        rather than sitting alongside it -- a form sent under
+        ``application/json`` is rejected as malformed, naming the wrong thing.
+        """
+        content_type, body = encode_multipart(build_transcription_form(request))
+        headers = {**self._headers(len(body)), "Content-Type": content_type}
+
+        response = self._transport.send(
+            HttpRequest(
+                method="POST",
+                url=f"{self.url}/audio/transcriptions",
+                headers=headers,
+                body=body,
+                timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+            )
+        )
+
+        decoded = self._decode(response.status, response.body)
+
+        if response.status >= 400:
+            raise PrismError.provider_response_error(
+                f"OpenAI error [{response.status}]: "
+                f"{data_get(decoded, 'error.message', 'unknown')}",
+                status=response.status,
+                body=response.body.decode("utf-8", errors="replace"),
+            )
+
+        return parse_transcription_response(decoded)
 
     def _send(
         self,

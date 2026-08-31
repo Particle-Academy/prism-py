@@ -32,6 +32,8 @@ class ErrorCode(str, Enum):
     NO_IMAGE_PROMPT = "no_image_prompt"
     NO_MODERATION_INPUT = "no_moderation_input"
     UNREADABLE_MEDIA_FILE = "unreadable_media_file"
+    WRONG_AUDIO_INPUT = "wrong_audio_input"
+    NO_AUDIO_CONTENT = "no_audio_content"
 
 
 class PrismError(Exception):

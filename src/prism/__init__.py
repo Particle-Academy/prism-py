@@ -15,11 +15,26 @@ API:
 from __future__ import annotations
 
 from prism import canonical
+from prism.audio import (
+    AudioPendingRequest,
+    AudioResponse,
+    AudioTextResponse,
+    SpeechToTextRequest,
+    TextToSpeechRequest,
+)
 from prism.canonical import encode as canonical_encode
 from prism.enums import FinishReason, ToolChoice
 from prism.enums import Provider as ProviderName
 from prism.errors import ErrorCode, PrismError
-from prism.http import HttpRequest, HttpResponse, Transport, UrllibTransport
+from prism.http import (
+    HttpRequest,
+    HttpResponse,
+    MultipartBody,
+    MultipartFile,
+    Transport,
+    UrllibTransport,
+    encode_multipart,
+)
 from prism.prism import Prism
 from prism.providers.base import Provider
 from prism.providers.openai import OpenAI, build_request_body, build_tools, parse_text_response
@@ -42,18 +57,30 @@ from prism.value_objects import (
     UserMessage,
     message_from_dict,
 )
+from prism.value_objects.generated_audio import GeneratedAudio
+from prism.value_objects.media_file import Audio, Document, Image, Media, Video
 
 __version__ = "0.1.0"
 
 __all__ = [
     "AssistantMessage",
+    "Audio",
+    "AudioPendingRequest",
+    "AudioResponse",
+    "AudioTextResponse",
     "BooleanSchema",
+    "Document",
     "ErrorCode",
     "FinishReason",
+    "GeneratedAudio",
     "HttpRequest",
     "HttpResponse",
+    "Image",
+    "Media",
     "Message",
     "Meta",
+    "MultipartBody",
+    "MultipartFile",
     "NumberSchema",
     "OpenAI",
     "PendingRequest",
@@ -67,10 +94,12 @@ __all__ = [
     "Response",
     "ResponseBuilder",
     "Schema",
+    "SpeechToTextRequest",
     "Step",
     "StringSchema",
     "SystemMessage",
     "Text",
+    "TextToSpeechRequest",
     "Tool",
     "ToolCall",
     "ToolChoice",
@@ -80,11 +109,13 @@ __all__ = [
     "UrllibTransport",
     "Usage",
     "UserMessage",
+    "Video",
     "__version__",
     "build_request_body",
     "build_tools",
     "canonical",
     "canonical_encode",
+    "encode_multipart",
     "message_from_dict",
     "parse_text_response",
     "register_provider",
