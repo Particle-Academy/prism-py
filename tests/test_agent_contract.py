@@ -110,3 +110,11 @@ def test_a_changed_agent_file_is_reported_as_stale() -> None:
         assert agent.status({})["agent_stale"] is True
     finally:
         agent.LOADED_DIGEST = original
+
+
+def test_the_digest_covers_the_package_not_just_the_agent_module() -> None:
+    # The first version hashed the agent module alone and reported
+    # `agent_stale: false` while the running process answered from a package it
+    # had imported before the edit. A signal that misses a stale surface is
+    # worse than none, because it is believed.
+    assert agent.loaded_digest() != agent._digest_of(agent.AGENT_SOURCE)

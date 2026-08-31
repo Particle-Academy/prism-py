@@ -166,6 +166,7 @@ def _tail(text: str, lines: int = 40) -> str:
 
 
 AGENT_SOURCE = Path(__file__).resolve()
+PACKAGE_DIR = ROOT / "src" / "prism"
 
 
 def _digest_of(path: Path) -> str | None:
@@ -175,20 +176,44 @@ def _digest_of(path: Path) -> str | None:
         return None
 
 
-#: A digest of this file, taken when the process STARTED.
+def loaded_digest() -> str | None:
+    """The agent module's bytes, plus a stat fingerprint of the package it imported.
+
+    TWO SOURCES, not one. The first version of this hashed the agent module
+    alone and claimed nothing else could go stale. That was WRONG, and the
+    TypeScript port caught it within the hour: an agent imports the package at
+    start-up and keeps it, so a package edit leaves the process answering from
+    the old code while ``agent_stale`` says false. A staleness signal that
+    misses a stale surface is worse than none, because it is believed.
+
+    ``src/prism`` is fingerprinted by path, size and mtime rather than read, so
+    this stays cheap enough for a call documented as safe to poll.
+    """
+    digest = hashlib.sha256()
+
+    try:
+        digest.update(AGENT_SOURCE.read_bytes())
+    except OSError:
+        return None
+
+    for path in sorted(PACKAGE_DIR.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+
+        stat = path.stat()
+        digest.update(f"{path}:{stat.st_size}:{stat.st_mtime_ns}".encode())
+
+    return digest.hexdigest()[:12]
+
+
+#: A digest of everything this process LOADED, taken when it started.
 #:
 #: The running server is the one thing a test over the source cannot check. A
 #: server started before a tool was added keeps serving the old list, the only
 #: consumer is a Lab screen that reports what it is told, and the staleness is
 #: invisible from both ends -- which is precisely what happened, on both ports.
 #: See the port gaps register, G-12.
-#:
-#: Comparing this against the file on disk lets the agent answer "am I running
-#: the code that is checked out?" itself, rather than leaving someone to notice.
-#: It covers the agent module and nothing else, which is the whole surface that
-#: can go stale: every other tool reads the port from disk or spawns a child
-#: process at call time, so they are current by construction.
-LOADED_DIGEST = _digest_of(AGENT_SOURCE)
+LOADED_DIGEST = loaded_digest()
 
 
 def status(_: dict[str, Any]) -> dict[str, Any]:
@@ -208,7 +233,7 @@ def status(_: dict[str, Any]) -> dict[str, Any]:
         # TRUE means this process is running code that is no longer on disk and
         # its tool list may be wrong. Restart it before believing anything else
         # here.
-        "agent_stale": LOADED_DIGEST is not None and LOADED_DIGEST != _digest_of(AGENT_SOURCE),
+        "agent_stale": LOADED_DIGEST is not None and LOADED_DIGEST != loaded_digest(),
     }
 
 
