@@ -208,8 +208,7 @@ def status(_: dict[str, Any]) -> dict[str, Any]:
         # TRUE means this process is running code that is no longer on disk and
         # its tool list may be wrong. Restart it before believing anything else
         # here.
-        "agent_stale": LOADED_DIGEST is not None
-        and LOADED_DIGEST != _digest_of(AGENT_SOURCE),
+        "agent_stale": LOADED_DIGEST is not None and LOADED_DIGEST != _digest_of(AGENT_SOURCE),
     }
 
 
