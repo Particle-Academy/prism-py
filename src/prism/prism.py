@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from prism.embeddings.pending_request import EmbeddingsPendingRequest
 from prism.structured.pending_request import StructuredPendingRequest
 from prism.text.pending_request import PendingRequest
 
@@ -26,3 +27,8 @@ class Prism:
     def structured() -> StructuredPendingRequest:
         """Begin a generation that must come back shaped."""
         return StructuredPendingRequest()
+
+    @staticmethod
+    def embeddings() -> EmbeddingsPendingRequest:
+        """Begin an embeddings request."""
+        return EmbeddingsPendingRequest()

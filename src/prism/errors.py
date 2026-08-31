@@ -27,6 +27,8 @@ class ErrorCode(str, Enum):
     TOOL_LOOP_NOT_SUPPORTED = "tool_loop_not_supported"
     MISSING_SCHEMA = "missing_schema"
     UNSUPPORTED_STRUCTURED_MODEL = "unsupported_structured_model"
+    NO_EMBEDDING_INPUT = "no_embedding_input"
+    UNREADABLE_INPUT_FILE = "unreadable_input_file"
 
 
 class PrismError(Exception):

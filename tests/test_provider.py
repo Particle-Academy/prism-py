@@ -191,7 +191,10 @@ def test_the_base_contract_refuses_every_capability_with_a_code(action: str) -> 
 
 
 def test_an_unimplemented_capability_on_openai_still_refuses() -> None:
+    # `embeddings` left this test when the capability shipped. Naming the
+    # capability rather than reflecting over the class is the point:
+    # implementing one has to be a deliberate edit here.
     with pytest.raises(PrismError) as raised:
-        OpenAI(api_key="sk-test").embeddings(None)
+        OpenAI(api_key="sk-test").images(None)
 
     assert raised.value.code == "unsupported_provider_action"
