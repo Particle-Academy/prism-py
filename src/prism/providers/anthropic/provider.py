@@ -4,15 +4,26 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Iterator
 from typing import Any
 
 from prism import canonical
 from prism._php import data_get
 from prism.errors import PrismError
-from prism.http import DEFAULT_TIMEOUT, HttpRequest, Transport, UrllibTransport
+from prism.http import (
+    DEFAULT_TIMEOUT,
+    HttpRequest,
+    StreamTransport,
+    Transport,
+    UrllibStreamTransport,
+    UrllibTransport,
+)
 from prism.providers.anthropic.request_body import build_request_body
 from prism.providers.anthropic.response import parse_text_response
+from prism.providers.anthropic.stream_events import AnthropicStreamMapper
 from prism.providers.base import Provider
+from prism.streaming.events import StreamEvent
+from prism.streaming.sse import sse_data
 from prism.structured.from_text import structured_from_text_response
 from prism.structured.request import StructuredRequest
 from prism.structured.response import StructuredResponse
@@ -51,6 +62,7 @@ class Anthropic(Provider):
         api_version: str | None = None,
         beta_features: str | None = None,
         transport: Transport | None = None,
+        stream_transport: StreamTransport | None = None,
         timeout: float | None = None,
     ) -> None:
         self.api_key = api_key if api_key is not None else os.environ.get("ANTHROPIC_API_KEY", "")
@@ -65,6 +77,7 @@ class Anthropic(Provider):
         )
         self.timeout = timeout
         self._transport: Transport = transport or UrllibTransport()
+        self._stream_transport: StreamTransport = stream_transport or UrllibStreamTransport()
 
     def text(self, request: Request) -> Response:
         body = canonical.encode(build_request_body(request)).encode("utf-8")
@@ -89,6 +102,49 @@ class Anthropic(Provider):
             )
 
         return parse_text_response(request, decoded)
+
+    def stream(self, request: Request) -> Iterator[StreamEvent]:
+        """The same generation, delivered as it arrives.
+
+        The mapper is constructed PER CALL, not shared. It carries the message
+        id, the accumulated text and the stop reason for one stream; a shared
+        instance would let two concurrent generations read each other's blocks,
+        which is the kind of bug that only appears under load and looks like the
+        model hallucinating.
+        """
+        payload = {**build_request_body(request), "stream": True}
+        body = canonical.encode(payload).encode("utf-8")
+        headers = {**self._headers(len(body)), "Accept": "text/event-stream"}
+
+        response = self._stream_transport.stream(
+            HttpRequest(
+                method="POST",
+                url=f"{self.url}/messages",
+                headers=headers,
+                body=body,
+                timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+            )
+        )
+
+        if response.status >= 400:
+            text = "".join(response.chunks)
+            raise PrismError.provider_response_error(
+                f"Anthropic error [{response.status}]: "
+                f"{data_get(_loads(text), 'error.message', 'unknown')}",
+                status=response.status,
+                body=text,
+            )
+
+        return self._events(response.chunks)
+
+    def _events(self, chunks: Iterator[str]) -> Iterator[StreamEvent]:
+        mapper = AnthropicStreamMapper()
+
+        for payload in sse_data(chunks):
+            event = mapper.map(_loads(payload))
+
+            if event is not None:
+                yield event
 
     def structured(self, request: StructuredRequest) -> StructuredResponse:
         """Structured output by ASKING, because Anthropic has no schema mode.
@@ -165,3 +221,13 @@ def _schema_instruction(request: StructuredRequest) -> str:
         "CONTENT outside the JSON) that matches the following schema: \n "
         + json.dumps(schema.to_dict(), indent=2)
     )
+
+
+def _loads(text: str) -> dict[str, Any]:
+    """An SSE payload that is not JSON is skipped rather than fatal."""
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        return {}
+
+    return parsed if isinstance(parsed, dict) else {}
