@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import uuid
 from collections.abc import Iterator
 from typing import Any
 from urllib.parse import quote, urlencode
@@ -12,6 +13,14 @@ from prism import canonical
 from prism._php import data_get
 from prism.audio.request import SpeechToTextRequest, TextToSpeechRequest
 from prism.audio.response import AudioResponse, AudioTextResponse
+from prism.batch.batch_job import BatchJob, BatchListResult, BatchResultItem
+from prism.batch.request import (
+    BatchRequest,
+    CancelBatchRequest,
+    GetBatchResultsRequest,
+    ListBatchesRequest,
+    RetrieveBatchRequest,
+)
 from prism.embeddings.request import EmbeddingsRequest
 from prism.embeddings.response import EmbeddingsResponse
 from prism.errors import PrismError
@@ -43,6 +52,14 @@ from prism.providers.openai.audio import (
     build_transcription_form,
     parse_speech_response,
     parse_transcription_response,
+)
+from prism.providers.openai.batch import (
+    build_batch_body,
+    build_batch_input_file,
+    build_batch_list_query,
+    parse_batch_job,
+    parse_batch_list_response,
+    parse_batch_results,
 )
 from prism.providers.openai.embeddings import build_embeddings_body, parse_embeddings_response
 from prism.providers.openai.files import (
@@ -346,21 +363,128 @@ class OpenAI(Provider):
 
         return response.body
 
+    # -- batch -------------------------------------------------------------
+
+    def batch(self, request: BatchRequest) -> BatchJob:
+        """Submit a batch, uploading its items as a file when they were given.
+
+        The either/or is checked HERE rather than on the request, because it is
+        a provider rule: a provider that accepted inline items would have
+        nothing to complain about.
+        """
+        if request.input_file_id is not None and request.items is not None:
+            raise PrismError.provider_response_error(
+                "OpenAI batch takes either an input file id or items, not both."
+            )
+
+        if request.input_file_id is None and request.items is None:
+            raise PrismError.provider_response_error(
+                "OpenAI batch needs either an input file id or items."
+            )
+
+        input_file_id = request.input_file_id
+
+        if input_file_id is None:
+            uploaded = self.upload_file(
+                UploadFileRequest(
+                    filename=f"prism-batch-{uuid.uuid4()}.jsonl",
+                    content=build_batch_input_file(request.items or ()).encode("utf-8"),
+                    mime_type="application/jsonl",
+                    provider_key="openai",
+                    client_options=dict(request.client_options),
+                    # `purpose` MUST be `batch` for a file the batch endpoint
+                    # will read, so it is set here rather than inherited from
+                    # whatever the caller passed for the batch itself.
+                    provider_options={"purpose": "batch"},
+                )
+            )
+            input_file_id = uploaded.id
+
+        return parse_batch_job(
+            self._file(
+                "POST",
+                "batches",
+                request,
+                json_body=build_batch_body(
+                    input_file_id, request.provider_options.get("completion_window")
+                ),
+            )
+        )
+
+    def retrieve_batch(self, request: RetrieveBatchRequest) -> BatchJob:
+        return parse_batch_job(
+            self._file("GET", f"batches/{quote(request.batch_id, safe='')}", request)
+        )
+
+    def list_batches(self, request: ListBatchesRequest) -> BatchListResult:
+        query = urlencode(build_batch_list_query(request))
+        path = "batches" if query == "" else f"batches?{query}"
+
+        return parse_batch_list_response(self._file("GET", path, request))
+
+    def cancel_batch(self, request: CancelBatchRequest) -> BatchJob:
+        return parse_batch_job(
+            self._file("POST", f"batches/{quote(request.batch_id, safe='')}/cancel", request)
+        )
+
+    def get_batch_results(self, request: GetBatchResultsRequest) -> tuple[BatchResultItem, ...]:
+        """Every result in a batch, from the files it wrote.
+
+        BOTH files are read, output and error, because a batch where some
+        requests succeeded and others failed writes to both -- reading only the
+        output file would silently drop every failure and report a clean run.
+
+        An unfinished batch has neither, and answers with an empty tuple rather
+        than an error: nothing went wrong, there is just nothing yet.
+        """
+        batch = self.retrieve_batch(
+            RetrieveBatchRequest(
+                batch_id=request.batch_id,
+                provider_key=request.provider_key,
+                client_options=dict(request.client_options),
+                provider_options=dict(request.provider_options),
+            )
+        )
+
+        items: list[BatchResultItem] = []
+
+        for file_id in (batch.output_file_id, batch.error_file_id):
+            if file_id is None:
+                continue
+
+            content = self.download_file(
+                DownloadFileRequest(
+                    file_id=file_id,
+                    provider_key=request.provider_key,
+                    client_options=dict(request.client_options),
+                )
+            )
+            items.extend(parse_batch_results(content.decode("utf-8", errors="replace")))
+
+        return tuple(items)
+
     def _file(
         self,
         method: str,
         path: str,
         request: Any,
         multipart: MultipartBody | None = None,
+        json_body: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """One round trip for the four file operations that answer with JSON.
+        """One round trip for every file and batch operation answering with JSON.
 
         Routed together so their headers, url building and error mapping are
         decided once. The alternative was upload on its own path because it
         sends a form, which is how two paths that should agree stop agreeing.
+        Batch joined them rather than growing a second copy: it has the same
+        error-inside-a-200 behaviour, and creating a batch uploads a file.
         """
         headers = self._headers(0)
         body: bytes | None = None
+
+        if json_body is not None:
+            body = canonical.encode(json_body).encode("utf-8")
+            headers = self._headers(len(body))
 
         if multipart is not None:
             content_type, body = encode_multipart(multipart)

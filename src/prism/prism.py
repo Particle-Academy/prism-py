@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from prism.audio.pending_request import AudioPendingRequest
+from prism.batch.pending_request import BatchPendingRequest
 from prism.embeddings.pending_request import EmbeddingsPendingRequest
 from prism.files.pending_request import FilesPendingRequest
 from prism.images.pending_request import ImagesPendingRequest
@@ -56,3 +57,8 @@ class Prism:
     def files() -> FilesPendingRequest:
         """Begin a file-storage operation."""
         return FilesPendingRequest()
+
+    @staticmethod
+    def batch() -> BatchPendingRequest:
+        """Begin a batch operation."""
+        return BatchPendingRequest()

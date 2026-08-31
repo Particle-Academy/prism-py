@@ -48,6 +48,18 @@ class Provider:
     def batch(self, request: Any) -> Any:
         self._unsupported("batch")
 
+    def retrieve_batch(self, request: Any) -> Any:
+        self._unsupported("retrieveBatch")
+
+    def list_batches(self, request: Any) -> Any:
+        self._unsupported("listBatches")
+
+    def get_batch_results(self, request: Any) -> Any:
+        self._unsupported("getBatchResults")
+
+    def cancel_batch(self, request: Any) -> Any:
+        self._unsupported("cancelBatch")
+
     def upload_file(self, request: Any) -> Any:
         self._unsupported("uploadFile")
 
