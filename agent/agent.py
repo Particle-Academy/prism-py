@@ -11,6 +11,7 @@ Standard library only, like the package it lives in.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -164,6 +165,32 @@ def _tail(text: str, lines: int = 40) -> str:
     return "\n".join(text.splitlines()[-lines:]).strip()
 
 
+AGENT_SOURCE = Path(__file__).resolve()
+
+
+def _digest_of(path: Path) -> str | None:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()[:12]
+    except OSError:
+        return None
+
+
+#: A digest of this file, taken when the process STARTED.
+#:
+#: The running server is the one thing a test over the source cannot check. A
+#: server started before a tool was added keeps serving the old list, the only
+#: consumer is a Lab screen that reports what it is told, and the staleness is
+#: invisible from both ends -- which is precisely what happened, on both ports.
+#: See the port gaps register, G-12.
+#:
+#: Comparing this against the file on disk lets the agent answer "am I running
+#: the code that is checked out?" itself, rather than leaving someone to notice.
+#: It covers the agent module and nothing else, which is the whole surface that
+#: can go stale: every other tool reads the port from disk or spawns a child
+#: process at call time, so they are current by construction.
+LOADED_DIGEST = _digest_of(AGENT_SOURCE)
+
+
 def status(_: dict[str, Any]) -> dict[str, Any]:
     return {
         "language": LANGUAGE,
@@ -177,6 +204,12 @@ def status(_: dict[str, Any]) -> dict[str, Any]:
         # Named, never returned. Whether a key EXISTS is a status question;
         # what it is never is.
         "can_reason": bool(os.environ.get(_api_key_var())),
+        "agent_source_digest": LOADED_DIGEST,
+        # TRUE means this process is running code that is no longer on disk and
+        # its tool list may be wrong. Restart it before believing anything else
+        # here.
+        "agent_stale": LOADED_DIGEST is not None
+        and LOADED_DIGEST != _digest_of(AGENT_SOURCE),
     }
 
 
@@ -407,8 +440,8 @@ Handler = Callable[[dict[str, Any]], dict[str, Any]]
 TOOLS: dict[str, dict[str, Any]] = {
     "status": {
         "description": (
-            "Report this agent's language, the port version it is running, and whether "
-            "it can reason. "
+            "Report this agent's language, the port version it is running, whether it can "
+            "reason, and whether this PROCESS is still running the code on disk. "
             "Cheap; safe to poll."
         ),
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},

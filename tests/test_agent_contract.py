@@ -86,3 +86,24 @@ def test_describe_port_separates_entry_points_from_provider_operations() -> None
 
     # G-14: fim is Mistral-only in the reference and no port has Mistral.
     assert "fim" not in operations
+
+
+def test_status_reports_whether_this_process_is_running_the_code_on_disk() -> None:
+    # G-12. The running server is the one thing a test over the source cannot
+    # check: a server started before a tool was added keeps serving the old
+    # list, and the only consumer is a Lab screen that reports what it is told.
+    # This is the agent answering the question itself.
+    reported = agent.status({})
+
+    assert reported["agent_source_digest"] is not None
+    assert reported["agent_stale"] is False
+
+
+def test_a_changed_agent_file_is_reported_as_stale() -> None:
+    # The signal has to actually fire, or it is a field that always says "fine".
+    original = agent.LOADED_DIGEST
+    try:
+        agent.LOADED_DIGEST = "0" * 12
+        assert agent.status({})["agent_stale"] is True
+    finally:
+        agent.LOADED_DIGEST = original
