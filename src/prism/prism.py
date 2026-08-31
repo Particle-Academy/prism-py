@@ -6,6 +6,7 @@ from prism.audio.pending_request import AudioPendingRequest
 from prism.batch.pending_request import BatchPendingRequest
 from prism.embeddings.pending_request import EmbeddingsPendingRequest
 from prism.files.pending_request import FilesPendingRequest
+from prism.fim.pending_request import FimPendingRequest
 from prism.images.pending_request import ImagesPendingRequest
 from prism.moderation.pending_request import ModerationPendingRequest
 from prism.structured.pending_request import StructuredPendingRequest
@@ -62,3 +63,8 @@ class Prism:
     def batch() -> BatchPendingRequest:
         """Begin a batch operation."""
         return BatchPendingRequest()
+
+    @staticmethod
+    def fim() -> FimPendingRequest:
+        """Begin a fill-in-the-middle completion."""
+        return FimPendingRequest()

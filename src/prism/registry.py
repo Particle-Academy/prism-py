@@ -51,6 +51,12 @@ def _default_factory(key: str) -> ProviderFactory | None:
         register_provider("anthropic", Anthropic)
         return Anthropic
 
+    if key == "mistral":
+        from prism.providers.mistral.provider import Mistral
+
+        register_provider("mistral", Mistral)
+        return Mistral
+
     if key == "openai":
         from prism.providers.openai.provider import OpenAI
 

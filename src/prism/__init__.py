@@ -53,6 +53,7 @@ from prism.files import (
     ListFilesRequest,
     UploadFileRequest,
 )
+from prism.fim import FimPendingRequest, FimRequest, FimResponse
 from prism.http import (
     HttpRequest,
     HttpResponse,
@@ -64,6 +65,7 @@ from prism.http import (
 )
 from prism.prism import Prism
 from prism.providers.base import Provider
+from prism.providers.mistral import Mistral, MistralStreamMapper
 from prism.providers.openai import OpenAI, build_request_body, build_tools, parse_text_response
 from prism.registry import register_provider, resolve_provider
 from prism.schema import BooleanSchema, NumberSchema, Schema, StringSchema
@@ -115,6 +117,9 @@ __all__ = [
     "FileData",
     "FileListResult",
     "FilesPendingRequest",
+    "FimPendingRequest",
+    "FimRequest",
+    "FimResponse",
     "FinishReason",
     "GeneratedAudio",
     "GetBatchResultsRequest",
@@ -127,6 +132,8 @@ __all__ = [
     "Media",
     "Message",
     "Meta",
+    "Mistral",
+    "MistralStreamMapper",
     "MultipartBody",
     "MultipartFile",
     "NumberSchema",

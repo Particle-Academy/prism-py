@@ -66,12 +66,13 @@ def test_describe_port_reports_capabilities_not_just_modules() -> None:
         "batch",
         "embeddings",
         "files",
+        "fim",
         "images",
         "moderation",
         "structured",
         "text",
     ]
-    assert described["providers_implemented"] == ["anthropic", "openai"]
+    assert described["providers_implemented"] == ["anthropic", "mistral", "openai"]
 
 
 def test_describe_port_separates_entry_points_from_provider_operations() -> None:
@@ -84,8 +85,10 @@ def test_describe_port_separates_entry_points_from_provider_operations() -> None
     for name in ("stream", "text_to_speech", "speech_to_text"):
         assert name in operations, f"{name} missing from provider_operations"
 
-    # G-14: fim is Mistral-only in the reference and no port has Mistral.
-    assert "fim" not in operations
+    # `fim` is here now that Mistral is -- it was absent while G-14 was open,
+    # and this line is what closing that gap looks like from the agent's side.
+    # It is an entry point AND an operation, unlike stream and the audio pair.
+    assert "fim" in operations
 
 
 def test_status_reports_whether_this_process_is_running_the_code_on_disk() -> None:
