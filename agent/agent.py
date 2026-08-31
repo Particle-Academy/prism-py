@@ -208,16 +208,79 @@ def describe_port(_: dict[str, Any]) -> dict[str, Any]:
         else []
     )
 
+    # The capability entry points, read from the Prism class the same way
+    # providers are read from the directory. Reporting only a module list made
+    # an agent infer capabilities from filenames, which is the same guessing
+    # that made it wrong about providers.
+    capabilities = _static_methods(ROOT / "src" / "prism" / "prism.py")
+
+    # What a provider can actually be ASKED to do, which is a different list
+    # from the entry points and the one the parity manifest counts. `stream` is
+    # a terminal on the text builder and `text_to_speech`/`speech_to_text` are
+    # terminals on `audio`, so an agent comparing eight entry points against the
+    # manifest's twelve would report a gap that is not there.
+    operations = sorted(
+        {
+            name
+            for provider in providers
+            for name in _overrides(providers_dir / provider / "provider.py")
+        }
+    )
+
     return {
         "language": LANGUAGE,
         "providers_implemented": providers,
         "provider_count": len(providers),
+        "capabilities_implemented": capabilities,
+        "capability_count": len(capabilities),
+        "provider_operations": operations,
         "modules": modules,
         "note": (
-            "A provider absent from providers_implemented is not implemented here at all - "
-            "not merely missing a field."
+            "A provider or capability absent from these lists is not implemented here at all - "
+            "not merely missing a field. capabilities_implemented are ENTRY POINTS "
+            "(Prism.x()); provider_operations is what a provider can be asked to do, and is the "
+            "list the parity manifest counts - they differ because stream is a terminal on the "
+            "text builder and text_to_speech/speech_to_text are terminals on audio. `fim` is "
+            "absent from both on purpose: it is Mistral-only in the reference and no port has "
+            "Mistral (port gaps register, G-14)."
         ),
     }
+
+
+def _static_methods(path: Path) -> list[str]:
+    """Names decorated with ``@staticmethod``, in source order, sorted."""
+    if not path.is_file():
+        return []
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    names = [
+        line.split("def ", 1)[1].split("(", 1)[0]
+        for index, line in enumerate(lines)
+        if line.lstrip().startswith("def ")
+        and index > 0
+        and lines[index - 1].strip() == "@staticmethod"
+    ]
+
+    return sorted(set(names))
+
+
+def _overrides(path: Path) -> list[str]:
+    """Public methods a provider defines, which is what it overrides.
+
+    A provider subclasses a base whose every capability refuses, so a method
+    defined on the subclass IS an implemented capability. Underscore-prefixed
+    helpers are internal and excluded.
+    """
+    if not path.is_file():
+        return []
+
+    return sorted(
+        {
+            line.split("def ", 1)[1].split("(", 1)[0]
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.startswith("    def ") and not line.split("def ", 1)[1].startswith("_")
+        }
+    )
 
 
 def run_conformance(_: dict[str, Any]) -> dict[str, Any]:
@@ -353,8 +416,9 @@ TOOLS: dict[str, dict[str, Any]] = {
     },
     "describe_port": {
         "description": (
-            "What this port actually implements - providers and modules. Read from the source, "
-            "not remembered. Call this before reasoning about whether a feature exists here."
+            "What this port actually implements - providers, capabilities and modules. Read from "
+            "the source, not remembered. Call this before reasoning about whether a feature "
+            "exists here."
         ),
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
         "handler": describe_port,
