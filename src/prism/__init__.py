@@ -26,6 +26,17 @@ from prism.canonical import encode as canonical_encode
 from prism.enums import FinishReason, ToolChoice
 from prism.enums import Provider as ProviderName
 from prism.errors import ErrorCode, PrismError
+from prism.files import (
+    DeleteFileRequest,
+    DeleteFileResult,
+    DownloadFileRequest,
+    FileData,
+    FileListResult,
+    FilesPendingRequest,
+    GetFileMetadataRequest,
+    ListFilesRequest,
+    UploadFileRequest,
+)
 from prism.http import (
     HttpRequest,
     HttpResponse,
@@ -69,13 +80,21 @@ __all__ = [
     "AudioResponse",
     "AudioTextResponse",
     "BooleanSchema",
+    "DeleteFileRequest",
+    "DeleteFileResult",
     "Document",
+    "DownloadFileRequest",
     "ErrorCode",
+    "FileData",
+    "FileListResult",
+    "FilesPendingRequest",
     "FinishReason",
     "GeneratedAudio",
+    "GetFileMetadataRequest",
     "HttpRequest",
     "HttpResponse",
     "Image",
+    "ListFilesRequest",
     "Media",
     "Message",
     "Meta",
@@ -106,6 +125,7 @@ __all__ = [
     "ToolResult",
     "ToolResultMessage",
     "Transport",
+    "UploadFileRequest",
     "UrllibTransport",
     "Usage",
     "UserMessage",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from prism.audio.pending_request import AudioPendingRequest
 from prism.embeddings.pending_request import EmbeddingsPendingRequest
+from prism.files.pending_request import FilesPendingRequest
 from prism.images.pending_request import ImagesPendingRequest
 from prism.moderation.pending_request import ModerationPendingRequest
 from prism.structured.pending_request import StructuredPendingRequest
@@ -50,3 +51,8 @@ class Prism:
     def moderation() -> ModerationPendingRequest:
         """Begin a moderation check."""
         return ModerationPendingRequest()
+
+    @staticmethod
+    def files() -> FilesPendingRequest:
+        """Begin a file-storage operation."""
+        return FilesPendingRequest()

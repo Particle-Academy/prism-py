@@ -51,6 +51,18 @@ class Provider:
     def upload_file(self, request: Any) -> Any:
         self._unsupported("uploadFile")
 
+    def list_files(self, request: Any) -> Any:
+        self._unsupported("listFiles")
+
+    def get_file_metadata(self, request: Any) -> Any:
+        self._unsupported("getFileMetadata")
+
+    def delete_file(self, request: Any) -> Any:
+        self._unsupported("deleteFile")
+
+    def download_file(self, request: Any) -> Any:
+        self._unsupported("downloadFile")
+
     def stream(self, request: Any) -> Any:
         self._unsupported("stream")
 

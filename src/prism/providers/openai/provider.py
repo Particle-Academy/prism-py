@@ -6,6 +6,7 @@ import json
 import os
 from collections.abc import Iterator
 from typing import Any
+from urllib.parse import quote, urlencode
 
 from prism import canonical
 from prism._php import data_get
@@ -14,9 +15,18 @@ from prism.audio.response import AudioResponse, AudioTextResponse
 from prism.embeddings.request import EmbeddingsRequest
 from prism.embeddings.response import EmbeddingsResponse
 from prism.errors import PrismError
+from prism.files.file_data import DeleteFileResult, FileData, FileListResult
+from prism.files.request import (
+    DeleteFileRequest,
+    DownloadFileRequest,
+    GetFileMetadataRequest,
+    ListFilesRequest,
+    UploadFileRequest,
+)
 from prism.http import (
     DEFAULT_TIMEOUT,
     HttpRequest,
+    MultipartBody,
     StreamTransport,
     Transport,
     UrllibStreamTransport,
@@ -35,6 +45,13 @@ from prism.providers.openai.audio import (
     parse_transcription_response,
 )
 from prism.providers.openai.embeddings import build_embeddings_body, parse_embeddings_response
+from prism.providers.openai.files import (
+    build_list_query,
+    build_upload_form,
+    parse_delete_response,
+    parse_file_data,
+    parse_file_list_response,
+)
 from prism.providers.openai.images import build_images_body, parse_images_response
 from prism.providers.openai.moderation import build_moderation_body, parse_moderation_response
 from prism.providers.openai.request_body import build_request_body
@@ -279,6 +296,109 @@ class OpenAI(Provider):
             )
 
         return parse_transcription_response(decoded)
+
+    # -- files -------------------------------------------------------------
+
+    def upload_file(self, request: UploadFileRequest) -> FileData:
+        return parse_file_data(self._file("POST", "files", request, build_upload_form(request)))
+
+    def list_files(self, request: ListFilesRequest) -> FileListResult:
+        query = urlencode(build_list_query(request))
+        path = "files" if query == "" else f"files?{query}"
+
+        return parse_file_list_response(self._file("GET", path, request))
+
+    def get_file_metadata(self, request: GetFileMetadataRequest) -> FileData:
+        return parse_file_data(
+            self._file("GET", f"files/{quote(request.file_id, safe='')}", request)
+        )
+
+    def delete_file(self, request: DeleteFileRequest) -> DeleteFileResult:
+        return parse_delete_response(
+            self._file("DELETE", f"files/{quote(request.file_id, safe='')}", request)
+        )
+
+    def download_file(self, request: DownloadFileRequest) -> bytes:
+        """The file's bytes, returned WITHOUT being decoded.
+
+        The only file operation that does not go through ``_file``, because that
+        helper decodes JSON and this one must not: a downloaded PDF run through
+        a JSON parse raises, and the failure would name the decode rather than
+        the download.
+        """
+        response = self._transport.send(
+            HttpRequest(
+                method="GET",
+                url=f"{self.url}/files/{quote(request.file_id, safe='')}/content",
+                headers=self._headers(0),
+                timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+            )
+        )
+
+        if response.status >= 400:
+            decoded = self._decode(response.status, response.body)
+            raise PrismError.provider_response_error(
+                f"OpenAI error [{response.status}]: "
+                f"{data_get(decoded, 'error.message', 'unknown')}",
+                status=response.status,
+                body=response.body.decode("utf-8", errors="replace"),
+            )
+
+        return response.body
+
+    def _file(
+        self,
+        method: str,
+        path: str,
+        request: Any,
+        multipart: MultipartBody | None = None,
+    ) -> dict[str, Any]:
+        """One round trip for the four file operations that answer with JSON.
+
+        Routed together so their headers, url building and error mapping are
+        decided once. The alternative was upload on its own path because it
+        sends a form, which is how two paths that should agree stop agreeing.
+        """
+        headers = self._headers(0)
+        body: bytes | None = None
+
+        if multipart is not None:
+            content_type, body = encode_multipart(multipart)
+            # REPLACES the JSON content type rather than sitting alongside it: a
+            # form sent under application/json is rejected as malformed, naming
+            # the wrong thing.
+            headers = {**self._headers(len(body)), "Content-Type": content_type}
+
+        response = self._transport.send(
+            HttpRequest(
+                method=method,
+                url=f"{self.url}/{path}",
+                headers=headers,
+                body=body,
+                timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+            )
+        )
+
+        decoded = self._decode(response.status, response.body)
+
+        if response.status >= 400:
+            raise PrismError.provider_response_error(
+                f"OpenAI error [{response.status}]: "
+                f"{data_get(decoded, 'error.message', 'unknown')}",
+                status=response.status,
+                body=response.body.decode("utf-8", errors="replace"),
+            )
+
+        # OpenAI reports some file failures with a 200 and an `error` object, so
+        # the status alone is not the verdict.
+        if isinstance(decoded.get("error"), dict):
+            raise PrismError.provider_response_error(
+                f"OpenAI error: {data_get(decoded, 'error.message', 'unknown')}",
+                status=response.status,
+                body=response.body.decode("utf-8", errors="replace"),
+            )
+
+        return decoded
 
     def _send(
         self,
