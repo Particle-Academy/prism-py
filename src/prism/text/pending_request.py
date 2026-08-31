@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from typing import Any
 
 from prism.enums import Provider as ProviderName
@@ -10,6 +10,7 @@ from prism.enums import ToolChoice
 from prism.errors import ErrorCode, PrismError
 from prism.providers.base import Provider
 from prism.registry import resolve_provider
+from prism.streaming.events import StreamEvent
 from prism.text.request import Request
 from prism.text.response import Response
 from prism.tool import Tool
@@ -209,6 +210,28 @@ class PendingRequest:
             provider_tools=list(self._provider_tools),
             reasoning_enabled=self._reasoning_enabled,
         )
+
+    def as_stream(self) -> Iterator[StreamEvent]:
+        """The same generation, delivered as it arrives.
+
+        Yields the provider's events and accumulates NOTHING. A caller that
+        wants the finished text collects the deltas it is already being handed;
+        a builder that quietly buffered them would double the memory of every
+        stream to serve the callers who do not need it.
+        """
+        if self._provider is None:
+            raise PrismError(
+                ErrorCode.UNSUPPORTED_PROVIDER_ACTION,
+                "No provider configured. Call using(<provider>, <model>) first.",
+            )
+
+        # The base Provider contract types every capability as `Any`, because
+        # most of them are unported. Narrowed here rather than there, so adding
+        # a capability does not have to touch the contract every provider
+        # implements.
+        events: Iterator[StreamEvent] = self._provider.stream(self.to_request())
+
+        return events
 
     def as_text(self) -> Response:
         """Send the request and return the parsed response."""

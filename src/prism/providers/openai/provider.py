@@ -4,16 +4,27 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Iterator
 from typing import Any
 
 from prism import canonical
 from prism._php import data_get
 from prism.errors import PrismError
-from prism.http import DEFAULT_TIMEOUT, HttpRequest, Transport, UrllibTransport
+from prism.http import (
+    DEFAULT_TIMEOUT,
+    HttpRequest,
+    StreamTransport,
+    Transport,
+    UrllibStreamTransport,
+    UrllibTransport,
+)
 from prism.providers.base import Provider
 from prism.providers.openai.request_body import build_request_body
 from prism.providers.openai.response import parse_text_response
+from prism.providers.openai.stream_events import map_stream_event
 from prism.providers.openai.structured_body import build_structured_body
+from prism.streaming.events import StreamEvent
+from prism.streaming.sse import sse_data
 from prism.structured.from_text import structured_from_text_response
 from prism.structured.request import StructuredRequest
 from prism.structured.response import StructuredResponse
@@ -44,6 +55,7 @@ class OpenAI(Provider):
         project: str | None = None,
         api_format: str = "responses",
         transport: Transport | None = None,
+        stream_transport: StreamTransport | None = None,
         timeout: float | None = None,
     ) -> None:
         self.api_key = api_key if api_key is not None else os.environ.get("OPENAI_API_KEY", "")
@@ -55,9 +67,54 @@ class OpenAI(Provider):
         self.api_format = api_format
         self.timeout = timeout
         self._transport: Transport = transport or UrllibTransport()
+        self._stream_transport: StreamTransport = stream_transport or UrllibStreamTransport()
 
     def text(self, request: Request) -> Response:
         return self._send(build_request_body(request), request, "text")
+
+    def stream(self, request: Request) -> Iterator[StreamEvent]:
+        """The same generation, delivered as it arrives.
+
+        ``stream: True`` is added to the SAME body the non-streamed path
+        builds, so the two cannot drift apart into different requests that
+        merely look alike.
+        """
+        if self.api_format != "responses":
+            self._unsupported(f"stream via the {self.api_format} API")
+
+        payload = {**build_request_body(request), "stream": True}
+        body = canonical.encode(payload).encode("utf-8")
+        headers = {**self._headers(len(body)), "Accept": "text/event-stream"}
+
+        response = self._stream_transport.stream(
+            HttpRequest(
+                method="POST",
+                url=f"{self.url}/responses",
+                headers=headers,
+                body=body,
+                timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+            )
+        )
+
+        if response.status >= 400:
+            # An error response is not an event stream; the message inside it is
+            # the only useful thing about this call.
+            text = "".join(response.chunks)
+            raise PrismError.provider_response_error(
+                f"OpenAI error [{response.status}]: "
+                f"{data_get(_loads(text), 'error.message', 'unknown')}",
+                status=response.status,
+                body=text,
+            )
+
+        return self._events(response.chunks)
+
+    def _events(self, chunks: Iterator[str]) -> Iterator[StreamEvent]:
+        for payload in sse_data(chunks):
+            event = map_stream_event(_loads(payload))
+
+            if event is not None:
+                yield event
 
     def _send(
         self,
@@ -141,3 +198,13 @@ class OpenAI(Provider):
             )
 
         return decoded
+
+
+def _loads(text: str) -> dict[str, Any]:
+    """An SSE payload that is not JSON is skipped rather than fatal."""
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        return {}
+
+    return parsed if isinstance(parsed, dict) else {}
