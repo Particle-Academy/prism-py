@@ -20,8 +20,11 @@ from prism.http import (
     UrllibStreamTransport,
     UrllibTransport,
 )
+from prism.images.request import ImagesRequest
+from prism.images.response import ImagesResponse
 from prism.providers.base import Provider
 from prism.providers.openai.embeddings import build_embeddings_body, parse_embeddings_response
+from prism.providers.openai.images import build_images_body, parse_images_response
 from prism.providers.openai.request_body import build_request_body
 from prism.providers.openai.response import parse_text_response
 from prism.providers.openai.stream_events import map_stream_event
@@ -149,6 +152,30 @@ class OpenAI(Provider):
             )
 
         return parse_embeddings_response(decoded)
+
+    def images(self, request: ImagesRequest) -> ImagesResponse:
+        body = canonical.encode(build_images_body(request)).encode("utf-8")
+        response = self._transport.send(
+            HttpRequest(
+                method="POST",
+                url=f"{self.url}/images/generations",
+                headers=self._headers(len(body)),
+                body=body,
+                timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+            )
+        )
+
+        decoded = self._decode(response.status, response.body)
+
+        if response.status >= 400:
+            raise PrismError.provider_response_error(
+                f"OpenAI error [{response.status}]: "
+                f"{data_get(decoded, 'error.message', 'unknown')}",
+                status=response.status,
+                body=response.body.decode("utf-8", errors="replace"),
+            )
+
+        return parse_images_response(decoded, request.model)
 
     def _send(
         self,

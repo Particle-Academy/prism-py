@@ -29,6 +29,7 @@ class ErrorCode(str, Enum):
     UNSUPPORTED_STRUCTURED_MODEL = "unsupported_structured_model"
     NO_EMBEDDING_INPUT = "no_embedding_input"
     UNREADABLE_INPUT_FILE = "unreadable_input_file"
+    NO_IMAGE_PROMPT = "no_image_prompt"
 
 
 class PrismError(Exception):
