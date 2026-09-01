@@ -27,13 +27,14 @@ import agent  # noqa: E402 - the path has to be set before the import
 
 
 def test_the_agent_exposes_exactly_the_tools_the_ecosystem_expects() -> None:
-    # The same seven as prism-ts, asserted independently rather than read across
+    # The same eight as prism-ts, asserted independently rather than read across
     # repos: this port must not need its sibling checked out to run its suite. A
     # tool on one agent and not the other is a gap the Lab shows as an empty
     # panel, so the two lists are kept identical on purpose.
     assert sorted(agent.TOOLS) == [
         "consensus",
         "describe_port",
+        "ecosystem_probe",
         "explain",
         "harness_probe",
         "run_conformance",
@@ -54,6 +55,34 @@ def test_the_harness_port_works_from_outside_its_own_repo() -> None:
     # The address all three languages share. If this drifts, a PHP app and this
     # port stop resolving the same session and nothing else reports it.
     assert report["session_key"] == "session:23bd5c8949f6:7:probe"
+
+
+def test_the_six_satellite_ports_work_from_outside_their_repos() -> None:
+    # The same claim the harness probe makes, for the other six families. Every
+    # check asks for the SECURITY property rather than the happy path, because a
+    # probe that only showed a guard letting good input through would pass
+    # equally well against a guard that lets everything through.
+    report = agent.TOOLS["ecosystem_probe"]["handler"]({})
+
+    assert report.get("reason") is None
+    assert [family["family"] for family in report["families"]] == [
+        "perplexity",
+        "opentelemetry",
+        "memory",
+        "mcp",
+        "browser",
+        "human-plus",
+    ]
+
+    failed = [
+        f"{family['family']}: {check['step']}"
+        for family in report["families"]
+        for check in family["checks"]
+        if not check["ok"]
+    ]
+
+    assert failed == []
+    assert report["ok"] is True
 
 
 def test_benchmark_is_not_exposed_and_that_is_a_tracked_gap() -> None:

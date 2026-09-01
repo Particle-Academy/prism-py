@@ -56,7 +56,7 @@ def _refuses(run: Any, expected: str) -> dict[str, Any]:
     """Did this raise, and did the message say what we expected it to say?"""
     try:
         run()
-    except Exception as error:  # noqa: BLE001 - the probe reports, it does not handle
+    except Exception as error:
         matched = re.search(expected, str(error), re.IGNORECASE) is not None
         return {"refused": True, "message": "as expected" if matched else str(error)}
 
@@ -85,8 +85,7 @@ def probe_ecosystem() -> dict[str, Any]:
                     "step": step,
                     "observed": observed,
                     "expected": expected,
-                    "ok": json.dumps(observed, default=str)
-                    == json.dumps(expected, default=str),
+                    "ok": json.dumps(observed, default=str) == json.dumps(expected, default=str),
                 }
             )
 
@@ -165,9 +164,9 @@ def probe_ecosystem() -> dict[str, Any]:
     on_tracer = RecordingTracer()
 
     ot.TelemetrySubscriber(off_tracer, ot.SpanStore()).on_generation_started(context, secret)
-    ot.TelemetrySubscriber(
-        on_tracer, ot.SpanStore(), capture_content=True
-    ).on_generation_started(context, secret)
+    ot.TelemetrySubscriber(on_tracer, ot.SpanStore(), capture_content=True).on_generation_started(
+        context, secret
+    )
 
     is_(
         "content capture is OFF by default",
@@ -257,9 +256,7 @@ def probe_ecosystem() -> dict[str, Any]:
 
     policy = br.BrowserPolicy(allowed_hosts=["docs.example.com"])
 
-    off_host = _refuses(
-        lambda: policy.assert_url("https://evil.test/"), "does not allow host"
-    )
+    off_host = _refuses(lambda: policy.assert_url("https://evil.test/"), "does not allow host")
     metadata = _refuses(
         lambda: br.BrowserPolicy(allowed_hosts=["169.254.169.254"]).assert_url(
             "https://169.254.169.254/"
@@ -360,9 +357,7 @@ def probe_ecosystem() -> dict[str, Any]:
     result = manager.call("probe:owner", attachment.id, "sheet_read")
     manager.announce("probe:owner", attachment.id, hp.Activity("reading", "cell:A1"))
 
-    wrong_owner = _refuses(
-        lambda: manager.tools("someone:else", attachment.id), "does not belong"
-    )
+    wrong_owner = _refuses(lambda: manager.tools("someone:else", attachment.id), "does not belong")
     human_only = _refuses(
         lambda: hp.TrustPolicy.every_tool().assert_allows(
             hp.ToolDefinition("terminal_confirm", "", {})
@@ -370,7 +365,11 @@ def probe_ecosystem() -> dict[str, Any]:
         "reserved for the human",
     )
 
-    is_("a trusted surface tool runs and comes back framed", "<untrusted-tool-output" in result, True)
+    is_(
+        "a trusted surface tool runs and comes back framed",
+        "<untrusted-tool-output" in result,
+        True,
+    )
     is_(
         "the agent announces itself AS an agent",
         notifications[-1]["params"]["actor"]["type"],
