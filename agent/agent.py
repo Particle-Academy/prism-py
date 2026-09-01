@@ -22,6 +22,11 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+# This file's own directory, so the probe beside it imports without the caller
+# having to arrange a package.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from harness_probe import probe_harness
 
 from prism import Prism
 from prism.registry import resolve_provider
@@ -496,6 +501,17 @@ TOOLS: dict[str, dict[str, Any]] = {
         ),
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
         "handler": describe_port,
+    },
+    "harness_probe": {
+        "description": (
+            "Exercise prism-harness-py end to end against a real disk: the volatile-durable "
+            "guard, a PHP-compatible session key, an approval that stops a run, and the resume "
+            "that runs the tool once a human answers. Free and deterministic -- the model is "
+            "scripted, because what is under test is the session and the thread, not a "
+            "provider. Safe to poll."
+        ),
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "handler": lambda _args: probe_harness(),
     },
     "run_conformance": {
         "description": (

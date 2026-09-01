@@ -27,7 +27,7 @@ import agent  # noqa: E402 - the path has to be set before the import
 
 
 def test_the_agent_exposes_exactly_the_tools_the_ecosystem_expects() -> None:
-    # The same six as prism-ts, asserted independently rather than read across
+    # The same seven as prism-ts, asserted independently rather than read across
     # repos: this port must not need its sibling checked out to run its suite. A
     # tool on one agent and not the other is a gap the Lab shows as an empty
     # panel, so the two lists are kept identical on purpose.
@@ -35,10 +35,25 @@ def test_the_agent_exposes_exactly_the_tools_the_ecosystem_expects() -> None:
         "consensus",
         "describe_port",
         "explain",
+        "harness_probe",
         "run_conformance",
         "run_tests",
         "status",
     ]
+
+
+def test_the_harness_port_works_from_outside_its_own_repo() -> None:
+    # The harness's own suite proves its pieces. This proves the assembled
+    # package works in a process that did not write it -- which is the claim a
+    # consumer actually depends on, and a different one.
+    report = agent.TOOLS["harness_probe"]["handler"]({})
+
+    assert report["ok"] is True
+    assert [step for step in report["steps"] if not step["ok"]] == []
+
+    # The address all three languages share. If this drifts, a PHP app and this
+    # port stop resolving the same session and nothing else reports it.
+    assert report["session_key"] == "session:23bd5c8949f6:7:probe"
 
 
 def test_benchmark_is_not_exposed_and_that_is_a_tracked_gap() -> None:
