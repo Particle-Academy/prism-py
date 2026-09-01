@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 # having to arrange a package.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from ecosystem_probe import probe_ecosystem
 from harness_probe import probe_harness
 
 from prism import Prism
@@ -512,6 +513,19 @@ TOOLS: dict[str, dict[str, Any]] = {
         ),
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
         "handler": lambda _args: probe_harness(),
+    },
+    "ecosystem_probe": {
+        "description": (
+            "Exercise the six satellite ports -- perplexity, opentelemetry, memory, mcp, "
+            "browser, human-plus -- end to end from OUTSIDE their repos, asking each for its "
+            "SECURITY property rather than its happy path: content capture off by default, a "
+            "pin that breaks when a tool description is swapped, the cloud metadata endpoint "
+            "refused even when allow-listed, an attachment another owner cannot reach. Free, "
+            "deterministic and network-free -- every seam these packages expose for a network "
+            "is injected. Safe to poll."
+        ),
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "handler": lambda _args: probe_ecosystem(),
     },
     "run_conformance": {
         "description": (
