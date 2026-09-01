@@ -8,7 +8,7 @@ and ship a defect with it. Both directions live here on purpose.
 
 from __future__ import annotations
 
-from prism.value_objects.media import Text
+from prism.value_objects.media import Part, Text, part_from_dict
 from prism.value_objects.messages import (
     AssistantMessage,
     Message,
@@ -28,6 +28,7 @@ __all__ = [
     "AssistantMessage",
     "Message",
     "Meta",
+    "Part",
     "ProviderTool",
     "ProviderToolCall",
     "SystemMessage",
@@ -38,4 +39,5 @@ __all__ = [
     "Usage",
     "UserMessage",
     "message_from_dict",
+    "part_from_dict",
 ]

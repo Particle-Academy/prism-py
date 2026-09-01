@@ -25,14 +25,28 @@ print(response.text)
 
 ## Scope
 
-One vertical slice, deliberately: the entry point, the pending-request builder,
-the provider contract, the OpenAI provider (Responses API), and the text
-capability with its message value objects.
+**Every capability the reference has**, and three of its eighteen providers.
+That is the shape of the remaining drift: one axis, not two.
 
-Not in this slice: streaming, structured output, embeddings, the tool-execution
-loop, and every provider except OpenAI. Unsupported capabilities raise a coded
-error rather than a missing attribute, and a response that finishes on tool
-calls is refused with `tool_loop_not_supported` rather than half-executed.
+- **Capabilities — all of them.** `text`, `structured`, `stream`, `embeddings`,
+  `images`, `moderation`, `audio` (`text_to_speech` and `speech_to_text`),
+  `files`, `batch`, `fim`. A user message carries images and documents, and each
+  provider spells them its own way.
+- **Providers — `anthropic`, `mistral`, `openai`.** The OpenAI provider speaks
+  the **Responses API**; Mistral brings the chat-completions shape, which is a
+  different wire format rather than a variant of it.
+
+Not in this port: **the tool-execution loop** — a response that finishes on tool
+calls is refused with `tool_loop_not_supported` rather than half-executed — and
+the fifteen providers the reference has and this one does not. An unsupported
+capability raises a coded error rather than a missing attribute.
+
+Not every capability reaches every provider, because not every provider has one.
+`images`, `moderation`, `text_to_speech`, `files` and `batch` are OpenAI-only
+here, and `fim` is Mistral-only because Mistral is the only provider that
+implements it at all — in the reference as well. See the envelope's port gaps
+register for which of those are work someone could do and which are facts about
+the provider.
 
 Two things this port has that the reference does not:
 

@@ -14,7 +14,7 @@ from prism.streaming.events import StreamEvent
 from prism.text.request import Request
 from prism.text.response import Response
 from prism.tool import Tool
-from prism.value_objects import Message, ProviderTool, SystemMessage, Text, UserMessage
+from prism.value_objects import Message, Part, ProviderTool, SystemMessage, UserMessage
 
 __all__ = ["PendingRequest"]
 
@@ -40,7 +40,7 @@ class PendingRequest:
         self._provider_key: str | None = None
         self._model: str = ""
         self._prompt: str | None = None
-        self._additional_content: list[Text] = []
+        self._additional_content: list[Part] = []
         self._system_prompts: list[SystemMessage] = []
         self._messages: list[Message] = []
         self._max_steps: int = 1
@@ -86,9 +86,14 @@ class PendingRequest:
     def with_prompt(
         self,
         prompt: str,
-        additional_content: Sequence[Text] | None = None,
+        additional_content: Sequence[Part] | None = None,
     ) -> PendingRequest:
-        """Set the single user turn this request is asking about."""
+        """Set the single user turn this request is asking about.
+
+        ``additional_content`` takes any message PART, not only text -- an
+        ``Image`` or a ``Document`` passed here reaches whichever provider the
+        request resolves to, in that provider's own spelling.
+        """
         self._prompt = prompt
         self._additional_content = list(additional_content or [])
         return self

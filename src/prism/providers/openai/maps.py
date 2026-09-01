@@ -9,6 +9,7 @@ from prism import canonical
 from prism._php import data_get, is_truthy, strval
 from prism.enums import FinishReason, ToolChoice
 from prism.errors import PrismError
+from prism.providers.support import data_uri
 from prism.tool import Tool
 from prism.value_objects import (
     AssistantMessage,
@@ -19,6 +20,7 @@ from prism.value_objects import (
     ToolResultMessage,
     UserMessage,
 )
+from prism.value_objects.media_file import Document, Image
 
 __all__ = [
     "map_finish_reason",
@@ -67,10 +69,73 @@ def map_messages(
 def _map_user_message(message: UserMessage) -> dict[str, Any]:
     # Additional attributes are SPREAD at item level — siblings of role and
     # content, not nested under a key of their own.
+    #
+    # Text leads, then images, then documents, matching the reference's order.
     return {
         "role": "user",
-        "content": [{"type": "input_text", "text": message.text()}],
+        "content": [
+            {"type": "input_text", "text": message.text()},
+            *(_map_image(image) for image in message.images()),
+            *(_map_document(document) for document in message.documents()),
+        ],
         **message.additional_attributes,
+    }
+
+
+def _map_image(image: Image) -> dict[str, Any]:
+    """The Responses API's image part.
+
+    ``image_url`` here is a BARE STRING, where Mistral's chat-completions shape
+    wraps the same value in an object. A file id goes in its own field rather
+    than through the url, because a ``data:`` uri and a provider-side file are
+    two different things to OpenAI even though both end up as ``input_image``.
+    """
+    if image.is_file_id():
+        return {"type": "input_image", "file_id": image.file_id()}
+
+    if image.is_url():
+        return {"type": "input_image", "image_url": image.url}
+
+    if not image.has_base64():
+        raise PrismError.unsupported_media(
+            "OpenAI", "image", "a file id, a url, or bytes it can send as base64"
+        )
+
+    return {"type": "input_image", "image_url": data_uri(image, "OpenAI", "image")}
+
+
+def _map_document(document: Document) -> dict[str, Any]:
+    """The Responses API's document part.
+
+    Three shapes for one concept, and the inline one needs a FILENAME: OpenAI
+    reads the extension off it to decide how to parse the bytes, so a document
+    with no title is sent as ``document`` rather than omitting the field,
+    matching the reference. The other two shapes carry the name in the url or
+    the file.
+
+    Chunks are rejected. They are text with no container, and only Anthropic has
+    somewhere to put them.
+    """
+    if document.is_file_id():
+        return {"type": "input_file", "file_id": document.file_id()}
+
+    if document.is_url():
+        return {"type": "input_file", "file_url": document.url}
+
+    if document.is_chunks():
+        raise PrismError.unsupported_media(
+            "OpenAI", "document", "a file id, a url, or bytes -- not pre-split chunks"
+        )
+
+    if not document.has_base64():
+        raise PrismError.unsupported_media(
+            "OpenAI", "document", "a file id, a url, or bytes it can send as base64"
+        )
+
+    return {
+        "type": "input_file",
+        "filename": document.document_title() or "document",
+        "file_data": data_uri(document, "OpenAI", "document"),
     }
 
 

@@ -6,11 +6,12 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from prism import canonical
-from prism._php import data_get
+from prism._php import data_get, where_not_null
 from prism.enums import FinishReason, ToolChoice
 from prism.errors import PrismError
 from prism.tool import Tool
 from prism.value_objects import ToolCall
+from prism.value_objects.media_file import Document, Image
 from prism.value_objects.messages import (
     AssistantMessage,
     Message,
@@ -92,7 +93,13 @@ def map_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
             items.append(
                 {
                     "role": "user",
-                    "content": [{"type": "text", "text": message.text()}],
+                    # Text leads, then images, then documents -- the reference's
+                    # order.
+                    "content": [
+                        {"type": "text", "text": message.text()},
+                        *(_map_image(image) for image in message.images()),
+                        *(_map_document(document) for document in message.documents()),
+                    ],
                     **message.additional_attributes,
                 }
             )
@@ -218,3 +225,104 @@ def map_tool_calls(blocks: Sequence[Mapping[str, Any]]) -> list[ToolCall]:
         )
         for block in blocks
     ]
+
+
+def _map_image(image: Image) -> dict[str, Any]:
+    """Anthropic's image block.
+
+    The payload never appears at the top level: it goes in a ``source`` object
+    whose OWN ``type`` says which of the three forms it is. So an image block
+    carries two ``type`` keys at two depths meaning different things -- the
+    outer one is the block kind, the inner one is where the bytes came from.
+    """
+    return {"type": "image", "source": _image_source(image)}
+
+
+def _image_source(image: Image) -> dict[str, Any]:
+    if image.is_file_id():
+        return {"type": "file", "file_id": image.file_id()}
+
+    if image.is_url():
+        return {"type": "url", "url": image.url}
+
+    encoded = image.base64()
+    mime_type = image.mime_type()
+
+    if encoded is None or mime_type is None:
+        raise PrismError.unsupported_media(
+            "Anthropic", "image", "a file id, a url, or bytes with a known mime type"
+        )
+
+    return {"type": "base64", "media_type": mime_type, "data": encoded}
+
+
+def _map_document(document: Document) -> dict[str, Any]:
+    """Anthropic's document block.
+
+    The only provider here that takes a document five ways, and the only one
+    that takes CHUNKS at all -- pre-split text as a ``content`` source, each
+    chunk its own text block.
+
+    Text documents go as ``text``, not base64: Anthropic reads a ``text/*``
+    source directly and base64-wrapping it would make the model's citations
+    point into an encoded blob.
+    """
+    return where_not_null(
+        {
+            "type": "document",
+            "title": document.document_title(),
+            "source": _document_source(document),
+        }
+    )
+
+
+def _document_source(document: Document) -> dict[str, Any]:
+    if document.is_file_id():
+        return {"type": "file", "file_id": document.file_id()}
+
+    if document.is_url():
+        return {"type": "url", "url": document.url}
+
+    chunks = document.chunks()
+
+    if chunks is not None:
+        return {
+            "type": "content",
+            "content": [{"type": "text", "text": chunk} for chunk in chunks],
+        }
+
+    mime_type = document.mime_type()
+    raw_content = document.raw_content()
+
+    if mime_type is not None and mime_type.startswith("text/"):
+        if raw_content is None:
+            raise PrismError.unsupported_media("Anthropic", "text document", "bytes it can decode")
+
+        # Refused BY NAME rather than left to raise UnicodeDecodeError. A
+        # document declared `text/plain` that is not actually UTF-8 is a caller
+        # mistake, and a coded error says which part is wrong; an uncoded
+        # decoder exception escaping a mapper says only that something failed
+        # deep inside. `prism-ts` replaced the invalid bytes with U+FFFD and
+        # sent the corruption on -- Anthropic cites into that content -- so both
+        # ports now refuse it, which is the answer they have to share.
+        try:
+            decoded = raw_content.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise PrismError.unsupported_media(
+                "Anthropic",
+                "text document",
+                f"valid UTF-8, or a mime type that is not text/* -- {error}",
+            ) from error
+
+        return {"type": "text", "media_type": mime_type, "data": decoded}
+
+    encoded = document.base64()
+
+    if encoded is None or mime_type is None:
+        raise PrismError.unsupported_media(
+            "Anthropic",
+            "document",
+            "a file id, a url, chunks, or bytes with a known mime type",
+        )
+
+    return {"type": "base64", "media_type": mime_type, "data": encoded}

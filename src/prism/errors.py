@@ -32,6 +32,7 @@ class ErrorCode(str, Enum):
     NO_IMAGE_PROMPT = "no_image_prompt"
     NO_MODERATION_INPUT = "no_moderation_input"
     UNREADABLE_MEDIA_FILE = "unreadable_media_file"
+    UNSUPPORTED_MEDIA = "unsupported_media"
     WRONG_AUDIO_INPUT = "wrong_audio_input"
     NO_AUDIO_CONTENT = "no_audio_content"
 
@@ -100,6 +101,20 @@ class PrismError(Exception):
         return cls(
             ErrorCode.MALFORMED_TOOL_CALL_ARGUMENTS,
             f"Tool call arguments for tool {tool_name} are not valid JSON.",
+        )
+
+    @classmethod
+    def unsupported_media(cls, provider: str, part: str, accepts: str) -> PrismError:
+        """Names the provider, the part, and WHAT IT WOULD ACCEPT.
+
+        The reference says only that the provider "does not support the mediums
+        available" and points at the docs. The form a payload is in is the whole
+        question here -- a url where bytes were needed, or the reverse -- so the
+        accepted forms belong in the message rather than a page away.
+        """
+        return cls(
+            ErrorCode.UNSUPPORTED_MEDIA,
+            f"{provider} cannot send this {part}: it accepts {accepts}.",
         )
 
     @classmethod

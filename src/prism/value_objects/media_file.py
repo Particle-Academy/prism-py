@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import base64 as _base64
 import mimetypes
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, cast
 
 from prism.errors import ErrorCode, PrismError
 
@@ -36,6 +37,19 @@ class Media:
       request at replay time, which is the hazard prism-harness documents about
       replaying threads.
     """
+
+    #: The discriminator in the serialised form, under the key ``kind``.
+    #:
+    #: NOT ``type``. :class:`~prism.value_objects.generated_audio.GeneratedAudio`
+    #: already serialises ``type`` as the provider's own format name (``mp3``,
+    #: ``wav``), so a discriminator spelled ``type`` would be overwritten by it
+    #: on exactly one subclass -- the kind of collision that round-trips fine in
+    #: every test that does not happen to use that class.
+    #:
+    #: A subclass of a subclass keeps its parent's kind: a ``GeneratedImage`` is
+    #: an ``image``, and reading one back as :class:`Image` loses only the
+    #: revised prompt, which is not something a user message carries.
+    KIND: ClassVar[str] = "media"
 
     def __init__(
         self,
@@ -171,13 +185,57 @@ class Media:
         return self._base64
 
     def to_dict(self) -> dict[str, Any]:
+        """The serialised form.
+
+        ``base64()``, not the base64 ATTRIBUTE: a payload built from raw content
+        or from a local file has bytes and an empty ``_base64`` until something
+        asks for it, so reading the attribute would serialise a full image as
+        ``base64: None`` and the round trip would silently return an empty one.
+        Encoding here costs one pass over bytes the caller has already decided
+        to persist.
+        """
         return {
+            "kind": self.KIND,
             "url": self.url,
-            "base64": self._base64,
+            "base64": self.base64(),
             "mime_type": self._mime_type,
             "file_id": self._file_id,
             "filename": self._filename,
         }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> Media:
+        """Rebuild a payload from its serialised form.
+
+        The local path is NOT restored: it names a file on the machine that
+        serialised this, and a path that resolves to a different file elsewhere
+        is worse than no path at all. The bytes travel as base64 instead.
+
+        Only ever reached for the four kinds :func:`part_from_dict` dispatches
+        to. ``GeneratedImage`` and ``GeneratedAudio`` take different constructor
+        arguments and are not message parts, so they are not read back here.
+
+        Every field is TYPE-CHECKED, and a value that is not a string becomes
+        ``None`` rather than being carried. What arrives here is whatever a
+        consumer stored -- a database row, a replayed thread -- so it is not
+        this package's own output by the time it comes back. Without the check a
+        stored ``file_id`` of the wrong type reaches the provider payload
+        unexamined, and ``prism-ts`` already nulled it, so the two ports
+        disagreed on the same stored message.
+        """
+
+        def as_str(key: str) -> str | None:
+            value = data.get(key)
+            return value if isinstance(value, str) else None
+
+        media = cls(
+            url=as_str("url"),
+            base64_data=as_str("base64"),
+            mime_type=as_str("mime_type"),
+        )
+        media._file_id = as_str("file_id")
+        media._filename = as_str("filename")
+        return media
 
 
 class Image(Media):
@@ -187,17 +245,109 @@ class Image(Media):
     audio file differ in what a provider does with them, not in what they are.
     """
 
+    KIND: ClassVar[str] = "image"
+
 
 class Audio(Media):
     """A recording to transcribe, or speech that was generated."""
 
-
-class Document(Media):
-    """A document."""
+    KIND: ClassVar[str] = "audio"
 
 
 class Video(Media):
     """A video."""
+
+    KIND: ClassVar[str] = "video"
+
+
+class Document(Media):
+    """A document -- a PDF, a text file, or text supplied directly as chunks.
+
+    Two things a plain :class:`Media` does not have, because every provider that
+    accepts a document asks for them:
+
+    - a TITLE, sent as ``document_name`` by Mistral, ``filename`` by OpenAI and
+      ``title`` by Anthropic;
+    - CHUNKS, pre-split text sent as a ``content`` source. Anthropic is the only
+      provider here that takes them.
+
+    ONE DELIBERATE DIVERGENCE FROM THE REFERENCE. The reference threads the
+    title through every factory as the SECOND positional argument --
+    ``Document::fromUrl($url, $title)`` -- where the same position on the
+    :class:`Media` base means the mime type. So
+    ``Document::fromUrl($url, 'application/pdf')`` silently sets the title to
+    "application/pdf" and leaves the mime type unset. Both are strings, so
+    nothing catches it. The factories keep their base meaning here and the title
+    is set by :meth:`titled`, which cannot be confused with anything.
+    """
+
+    KIND: ClassVar[str] = "document"
+
+    def __init__(
+        self,
+        url: str | None = None,
+        base64_data: str | None = None,
+        mime_type: str | None = None,
+    ) -> None:
+        super().__init__(url, base64_data, mime_type)
+        self._document_title: str | None = None
+        self._chunks: list[str] | None = None
+
+    @classmethod
+    def from_chunks(cls, chunks: Sequence[str], title: str | None = None) -> Document:
+        """A document supplied as pre-split text.
+
+        Carries no bytes and no mime type -- the chunks ARE the document. Only
+        Anthropic accepts this form; the other two mappers reject it by name
+        rather than sending an empty payload.
+        """
+        document = cls()
+        document._chunks = list(chunks)
+        return document if title is None else document.titled(title)
+
+    @classmethod
+    def from_text(cls, text: str, title: str | None = None) -> Document:
+        """Text as a document, rather than as part of the prompt."""
+        document: Document = cls.from_raw_content(text.encode("utf-8"), "text/plain")
+        return document if title is None else document.titled(title)
+
+    def titled(self, title: str) -> Document:
+        """Name this document for the provider. Returns itself, so it chains onto a factory."""
+        self._document_title = title
+        return self
+
+    def document_title(self) -> str | None:
+        return self._document_title
+
+    def chunks(self) -> list[str] | None:
+        return self._chunks
+
+    def is_chunks(self) -> bool:
+        return self._chunks is not None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            **super().to_dict(),
+            "document_title": self._document_title,
+            "chunks": None if self._chunks is None else list(self._chunks),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> Document:
+        # `cls` is Document, so this cast is sound; the base signature cannot say
+        # so without `typing.Self`, which arrived in 3.11 and this package floors
+        # at 3.10.
+        document = cast("Document", super().from_dict(data))
+
+        title = data.get("document_title")
+        if isinstance(title, str):
+            document.titled(title)
+
+        chunks = data.get("chunks")
+        if isinstance(chunks, list):
+            document._chunks = [chunk for chunk in chunks if isinstance(chunk, str)]
+
+        return document
 
 
 def guess_mime_type(path: str) -> str | None:

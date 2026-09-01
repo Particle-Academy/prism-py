@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Callable
@@ -237,6 +238,23 @@ def status(_: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _registered_providers(path: Path) -> list[str]:
+    """The provider keys the registry resolves, read from its source.
+
+    A regex over the lazy-import branches rather than an import of the registry
+    itself: `describe_port` answers from DISK on purpose, so that it reports the
+    checkout rather than whatever this process loaded at start-up. `status`
+    answers the other question, from the loaded package, and `agent_stale` is
+    what reconciles the two.
+    """
+    try:
+        source = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+
+    return re.findall(r'if key == "([\w-]+)":', source)
+
+
 def describe_port(_: dict[str, Any]) -> dict[str, Any]:
     """What this port actually implements, read from disk rather than remembered.
 
@@ -245,15 +263,14 @@ def describe_port(_: dict[str, Any]) -> dict[str, Any]:
     of from the port it lives in.
     """
     providers_dir = ROOT / "src" / "prism" / "providers"
-    providers = (
-        sorted(
-            entry.name
-            for entry in providers_dir.iterdir()
-            if entry.is_dir() and not entry.name.startswith("__")
-        )
-        if providers_dir.is_dir()
-        else []
-    )
+
+    # Read from the REGISTRY, which is what `using()` actually consults, and not
+    # from the directory names under `prism/providers`. Those were the first
+    # answer and they were wrong for the same reason the original bug was: a
+    # directory is a filename, and a filename is a guess. A shared, non-provider
+    # module beside the three real ones is not a provider, and a package would
+    # have been counted as one.
+    providers = sorted(_registered_providers(ROOT / "src" / "prism" / "registry.py"))
 
     modules = (
         sorted(

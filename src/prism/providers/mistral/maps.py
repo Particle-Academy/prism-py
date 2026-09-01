@@ -13,10 +13,12 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from prism._php import data_get
+from prism._php import data_get, where_not_null
 from prism.enums import FinishReason, ToolChoice
 from prism.errors import PrismError
+from prism.providers.support import data_uri
 from prism.tool import Tool
+from prism.value_objects.media_file import Document, Image
 from prism.value_objects.messages import (
     AssistantMessage,
     Message,
@@ -106,17 +108,63 @@ def _map_user_message(message: UserMessage) -> dict[str, Any]:
     does not change the shape of every other message in a transcript -- so a
     stored conversation stays comparable with itself.
 
-    IMAGE AND DOCUMENT PARTS ARE NOT MAPPED, because this port's ``UserMessage``
-    carries text parts and nothing else. The reference maps ``image_url`` and
-    ``document_url`` here; adding them without the message types to feed them
-    would be a branch nothing can reach. Recorded in the port gaps register
-    rather than stubbed.
+    Text leads, then images, then documents -- the reference's order. Mistral
+    does not document an ordering requirement, but the parts reach the model in
+    the order they are sent, so keeping it identical to the reference means a
+    transcript compared across the two ports and the reference matches byte for
+    byte rather than only semantically.
     """
     return {
         "role": "user",
-        "content": [{"type": "text", "text": message.text()}],
+        "content": [
+            {"type": "text", "text": message.text()},
+            *(_map_image(image) for image in message.images()),
+            *(_map_document(document) for document in message.documents()),
+        ],
         **message.additional_attributes,
     }
+
+
+def _map_image(image: Image) -> dict[str, Any]:
+    """Mistral's image part.
+
+    ``image_url`` is an OBJECT wrapping a url string, and the url is either a
+    real one or a ``data:`` uri carrying the bytes -- the chat-completions
+    shape, which is neither of the two the other providers here use. OpenAI's
+    Responses API spells the same thing ``input_image`` with a bare
+    ``image_url`` string, and Anthropic spells it a ``source`` block.
+    """
+    if not image.is_url() and not image.has_base64():
+        raise PrismError.unsupported_media(
+            "Mistral", "image", "a url, or bytes it can send as base64"
+        )
+
+    url = image.url if image.is_url() else data_uri(image, "Mistral", "image")
+
+    return {"type": "image_url", "image_url": {"url": url}}
+
+
+def _map_document(document: Document) -> dict[str, Any]:
+    """Mistral's document part.
+
+    A URL AND NOTHING ELSE. Mistral fetches the document itself, so unlike every
+    other media part in this package there is no base64 fallback -- a document
+    read from disk cannot be sent to Mistral at all, and saying so here is the
+    difference between a clear failure and a 422 naming a field the caller never
+    set.
+    """
+    if not document.is_url():
+        raise PrismError.unsupported_media(
+            "Mistral", "document", "a url only -- it fetches the document itself"
+        )
+
+    return where_not_null(
+        {
+            "type": "document_url",
+            "document_url": document.url,
+            "document_name": document.document_title(),
+        }
+    )
 
 
 def _map_assistant_message(message: AssistantMessage) -> dict[str, Any]:

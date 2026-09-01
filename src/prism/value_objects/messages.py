@@ -9,7 +9,8 @@ from typing import Any, ClassVar
 
 from prism.errors import PrismError
 from prism.value_objects._opaque import opaque_list
-from prism.value_objects.media import Text
+from prism.value_objects.media import Part, Text, part_from_dict
+from prism.value_objects.media_file import Audio, Document, Image, Media, Video
 from prism.value_objects.tool_call import ToolCall
 from prism.value_objects.tool_result import ToolResult
 
@@ -56,7 +57,7 @@ class UserMessage(Message):
     TYPE: ClassVar[str] = "user"
 
     content: str
-    additional_content: list[Text] = field(default_factory=list)
+    additional_content: list[Part] = field(default_factory=list)
     additional_attributes: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -64,8 +65,34 @@ class UserMessage(Message):
         self.additional_content = [*self.additional_content, Text(self.content)]
 
     def text(self) -> str:
-        """Every text part, concatenated — the text the provider is sent."""
+        """The TEXT parts, concatenated — the text the provider is sent.
+
+        Filtered, not read off every part: once a turn can carry an image, a
+        blind ``part.text`` would raise on it, or worse, read something else.
+        """
         return "".join(part.text for part in self.additional_content if isinstance(part, Text))
+
+    def images(self) -> list[Image]:
+        return [part for part in self.additional_content if isinstance(part, Image)]
+
+    def documents(self) -> list[Document]:
+        return [part for part in self.additional_content if isinstance(part, Document)]
+
+    def audios(self) -> list[Audio]:
+        return [part for part in self.additional_content if isinstance(part, Audio)]
+
+    def videos(self) -> list[Video]:
+        return [part for part in self.additional_content if isinstance(part, Video)]
+
+    def media(self) -> list[Media]:
+        """Every NON-TEXT part. Images and documents included.
+
+        The reference's equivalent filters on ``Audio || Video || Media`` and
+        the first two are redundant -- both extend ``Media`` -- so what it
+        returns is every media part, and this returns the same. Worth saying out
+        loud, because the name reads narrower than it is.
+        """
+        return [part for part in self.additional_content if isinstance(part, Media)]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -78,11 +105,12 @@ class UserMessage(Message):
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> UserMessage:
         content: str = data["content"]
-        parts = [Text.from_dict(part) for part in data.get("additional_content") or []]
+        parts: list[Part] = [part_from_dict(part) for part in data.get("additional_content") or []]
 
         # Drop the part the constructor will re-append. It is always last and
-        # always equal to the content.
-        if parts and parts[-1].text == content:
+        # always equal to the content. Only a TEXT part is ever dropped: a
+        # trailing image is a caller-supplied part and must survive.
+        if parts and isinstance(parts[-1], Text) and parts[-1].text == content:
             parts = parts[:-1]
 
         return cls(
