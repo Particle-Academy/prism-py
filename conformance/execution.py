@@ -6,6 +6,7 @@ compare failure SETS, rather than shelling out and parsing its own output.
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 from prism_conformance import Corpus, compare
@@ -19,10 +20,34 @@ LANGUAGE = "py"
 
 
 def run(corpus: Corpus, suite_ids: list[str], probe_id: str) -> list[dict[str, Any]]:
-    """Run each suite under one probe and return a report document per suite."""
-    mutation = mutations.for_probe(_probe_declaration(corpus, probe_id))
+    """Run each suite under one probe and return a report document per suite.
 
-    return [_run_suite(corpus, suite_id, probe_id, mutation) for suite_id in suite_ids]
+    A ``security-corpus`` suite is not run from here, and reporting nothing for
+    it is correct rather than a gap. Those suites have no ``expect``: each row
+    records what every language PRODUCED, per language, and the comparison lives
+    in the family's own three repositories (e.g.
+    ``prism-memory-py/tests/test_vector_storage_corpus.py`` and its two
+    siblings), where the code under test actually is. This runner drives the
+    port through the five golden-based kinds and nothing else.
+
+    Named on stderr rather than skipped silently, for the same reason the
+    reference runner names it: a suite whose kind is a typo would otherwise be
+    run by nothing at all and report as fine.
+    """
+    mutation = mutations.for_probe(_probe_declaration(corpus, probe_id))
+    runnable = []
+
+    for suite_id in suite_ids:
+        if corpus.suite(suite_id).manifest.get("kind") == "security-corpus":
+            print(
+                f"{suite_id}: security-corpus, run in the family's own repos -- not from here.",
+                file=sys.stderr,
+            )
+            continue
+
+        runnable.append(suite_id)
+
+    return [_run_suite(corpus, suite_id, probe_id, mutation) for suite_id in runnable]
 
 
 def failing_ids(corpus: Corpus, probe_id: str) -> dict[str, list[str]]:
