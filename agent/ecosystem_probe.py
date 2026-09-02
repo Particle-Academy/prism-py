@@ -364,6 +364,25 @@ def probe_ecosystem() -> dict[str, Any]:
         ),
         "reserved for the human",
     )
+    # ADVERSARIAL, and the reason the two below exist. The name is chosen by the
+    # SURFACE, so a probe that only ever asks with a well-behaved one cannot see
+    # a surface that did not send one. This probe reported the check above as
+    # green for the whole period G-33 and G-36 were live.
+    human_only_padded = _refuses(
+        lambda: hp.TrustPolicy.every_tool().assert_allows(
+            hp.ToolDefinition("terminal_confirm ", "", {})
+        ),
+        "reserved for the human|well-formed",
+    )
+    # Cyrillic U+0441. It is not the reserved word, so the reservation correctly
+    # does not fire -- the refusal has to come from the name rule, or an
+    # allowlist a human reads is lying to them.
+    homoglyph = _refuses(
+        lambda: hp.TrustPolicy.every_tool().assert_allows(
+            hp.ToolDefinition("\u0441onfirm", "", {})
+        ),
+        "well-formed",
+    )
 
     is_(
         "a trusted surface tool runs and comes back framed",
@@ -383,6 +402,16 @@ def probe_ecosystem() -> dict[str, Any]:
     is_(
         "confirmation stays with the human under wildcard trust",
         human_only,
+        {"refused": True, "message": "as expected"},
+    )
+    is_(
+        "and still does when the SURFACE pads the name",
+        human_only_padded,
+        {"refused": True, "message": "as expected"},
+    )
+    is_(
+        "a homoglyph tool name is refused outright",
+        homoglyph,
         {"refused": True, "message": "as expected"},
     )
 
