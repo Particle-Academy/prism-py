@@ -41,6 +41,48 @@ jobs:
 
       # The package has ZERO runtime dependencies on purpose, so the only thing
       # installed here beyond the package itself is the test tooling.
+      # The six satellite ports and the harness, as SIBLINGS, because that is
+      # how agent_contract's two probes reach them -- each is imported from its
+      # src/ tree, from outside its repo, which is the only thing in this suite
+      # asserting the packages work TOGETHER rather than each working alone.
+      #
+      # Those two tests failed on every run from 2026-09-01 (G-47) for the plain
+      # reason that a single-repo checkout has no siblings. Letting them skip
+      # when the siblings are absent was the tempting fix, and it is the failure
+      # this project is about -- the comment on the corpus checkout above makes
+      # the same argument. So CI supplies the siblings instead.
+      #
+      # No build step, unlike the TypeScript port: these are imported from src/.
+      - name: Checkout the sibling ports
+      - uses: actions/checkout@v4
+        with:
+          repository: Particle-Academy/prism-harness-py
+          path: .ports/prism-harness-py
+      - uses: actions/checkout@v4
+        with:
+          repository: Particle-Academy/prism-perplexity-py
+          path: .ports/prism-perplexity-py
+      - uses: actions/checkout@v4
+        with:
+          repository: Particle-Academy/prism-opentelemetry-py
+          path: .ports/prism-opentelemetry-py
+      - uses: actions/checkout@v4
+        with:
+          repository: Particle-Academy/prism-memory-py
+          path: .ports/prism-memory-py
+      - uses: actions/checkout@v4
+        with:
+          repository: Particle-Academy/prism-mcp-py
+          path: .ports/prism-mcp-py
+      - uses: actions/checkout@v4
+        with:
+          repository: Particle-Academy/prism-browser-py
+          path: .ports/prism-browser-py
+      - uses: actions/checkout@v4
+        with:
+          repository: Particle-Academy/prism-human-plus-py
+          path: .ports/prism-human-plus-py
+
       - name: Install
         run: python -m pip install --quiet -e ".[dev]"
 
@@ -51,3 +93,7 @@ jobs:
       # becomes permanent silently.
       - name: Tests
         run: python -m pytest -ra
+        env:
+          # Absolute, because the probes resolve this against the filesystem
+          # rather than against the process's working directory.
+          PRISM_PORTS_ROOT: ${{ github.workspace }}/.ports

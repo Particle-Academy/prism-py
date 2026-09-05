@@ -19,14 +19,23 @@ Mirrors `prism-ts/agent/harness-probe.mjs` step for step.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 import tempfile
 from pathlib import Path
 from typing import Any
 
-#: The sibling repo, two levels up from this file in `agent/`.
-_HARNESS_SRC = Path(__file__).resolve().parents[2] / "prism-harness-py" / "src"
+#: The sibling repo, two levels up from this file in `agent/`. See
+#: ecosystem_probe.py -- same root, same reason, and deliberately no skip path
+#: when the sibling is absent.
+_PORTS_ROOT = (
+    Path(os.environ["PRISM_PORTS_ROOT"]).resolve()
+    if os.environ.get("PRISM_PORTS_ROOT")
+    else Path(__file__).resolve().parents[2]
+)
+
+_HARNESS_SRC = _PORTS_ROOT / "prism-harness-py" / "src"
 
 
 def probe_harness() -> dict[str, Any]:

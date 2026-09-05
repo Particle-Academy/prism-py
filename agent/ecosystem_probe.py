@@ -21,6 +21,7 @@ Mirrors ``prism-ts/agent/ecosystem-probe.mjs`` check for check.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -31,7 +32,17 @@ FAMILIES = ["perplexity", "opentelemetry", "memory", "mcp", "browser", "human-pl
 # Resolved from THIS file, which sits in `agent/`, so the sibling repo is two
 # levels up. A bare relative path would resolve against the process's working
 # directory and silently miss.
-_ROOT = Path(__file__).resolve().parent.parent.parent
+#
+# CI has no siblings -- it checks out one repo -- so it checks them out into
+# .ports/ and points PRISM_PORTS_ROOT here. Deliberately NOT given a "siblings
+# absent, skip" path: these probes are the only thing asserting the ports work
+# TOGETHER, and a skip would turn the loudest check in the ecosystem into a
+# silent one, in exactly the environment where nobody is watching it.
+_ROOT = (
+    Path(os.environ["PRISM_PORTS_ROOT"]).resolve()
+    if os.environ.get("PRISM_PORTS_ROOT")
+    else Path(__file__).resolve().parent.parent.parent
+)
 
 
 def _load() -> tuple[dict[str, Any], list[str]]:
