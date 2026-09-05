@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from prism.enums import ToolChoice
+from prism.providers.anthropic import response as anthropic_response_module
 from prism.providers.openai import request_body as request_body_module
 from prism.providers.openai import response as response_module
 from prism.value_objects import Text, UserMessage
@@ -107,6 +108,33 @@ def _wrapping_installer(
 ) -> Callable[[], Callable[[], None]]:
     """An install that replaces ``module.name`` with ``wrap(original)``."""
     return lambda: _rebind(module, name, wrap(getattr(module, name)))
+
+
+def _wrapping_installer_across(
+    modules: Sequence[Any],
+    name: str,
+    wrap: Callable[[Any], Any],
+) -> Callable[[], Callable[[], None]]:
+    """The same, applied to EVERY module that defines the function.
+
+    A probe declares a SCOPE, and an installer bound to one provider's module
+    silently narrows it. `prompt-tokens-unadjusted` declares "response
+    parsing" and patched only the OpenAI module, so the Anthropic rows could
+    never fail it -- while the TypeScript harness mutates the parsed result
+    generically and did catch them. The two harnesses disagreed about what the
+    same probe covers, which is the thing a probe exists to rule out.
+    """
+
+    def install() -> Callable[[], None]:
+        undos = [_rebind(module, name, wrap(getattr(module, name))) for module in modules]
+
+        def undo() -> None:
+            for restore in reversed(undos):
+                restore()
+
+        return undo
+
+    return install
 
 
 # ---------------------------------------------------------------------------
@@ -282,7 +310,11 @@ _MUTATIONS: dict[str, Mutation] = {
     ),
     "prompt-tokens-unadjusted": Mutation(
         id="prompt-tokens-unadjusted",
-        install=_wrapping_installer(response_module, "_build_usage", _prompt_tokens_unadjusted),
+        install=_wrapping_installer_across(
+            (response_module, anthropic_response_module),
+            "_build_usage",
+            _prompt_tokens_unadjusted,
+        ),
     ),
     "omit-null-on-serialize": Mutation(id="omit-null-on-serialize", serialize=_omit_nulls),
     "omit-null-on-parse": Mutation(id="omit-null-on-parse", parsed=_omit_nulls),
