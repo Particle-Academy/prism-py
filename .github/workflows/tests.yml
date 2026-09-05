@@ -54,7 +54,7 @@ jobs:
       #
       # No build step, unlike the TypeScript port: these are imported from src/.
       - name: Checkout the sibling ports
-      - uses: actions/checkout@v4
+        uses: actions/checkout@v4
         with:
           repository: Particle-Academy/prism-harness-py
           path: .ports/prism-harness-py
