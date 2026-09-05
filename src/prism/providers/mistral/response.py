@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from prism._php import data_get, where_not_null
@@ -13,7 +13,7 @@ from prism.text.request import Request
 from prism.text.response import Response
 from prism.text.response_builder import ResponseBuilder
 from prism.text.step import Step
-from prism.value_objects import ToolCall
+from prism.value_objects import ProviderRateLimit, ToolCall
 from prism.value_objects.meta import Meta
 from prism.value_objects.usage import Usage
 
@@ -26,7 +26,11 @@ __all__ = [
 ]
 
 
-def parse_text_response(request: Request, raw_body: Any) -> Response:
+def parse_text_response(
+    request: Request,
+    raw_body: Any,
+    rate_limits: Sequence[ProviderRateLimit] = (),
+) -> Response:
     """Turn a raw payload into a :class:`~prism.text.response.Response`.
 
     No HTTP happens here, so a stored payload replays through exactly the code
@@ -46,7 +50,7 @@ def parse_text_response(request: Request, raw_body: Any) -> Response:
         raise PrismError.max_tokens_exceeded("length", "chat.completion")
 
     builder = ResponseBuilder()
-    builder.add_step(_build_step(data, request, finish_reason))
+    builder.add_step(_build_step(data, request, finish_reason, rate_limits))
 
     return builder.to_response()
 
@@ -134,7 +138,12 @@ def extract_thinking(message: Mapping[str, Any]) -> str | None:
     return joined or None
 
 
-def _build_step(data: dict[str, Any], request: Request, finish_reason: FinishReason) -> Step:
+def _build_step(
+    data: dict[str, Any],
+    request: Request,
+    finish_reason: FinishReason,
+    rate_limits: Sequence[ProviderRateLimit] = (),
+) -> Step:
     message = first_choice_message(data)
 
     return Step(
@@ -145,11 +154,14 @@ def _build_step(data: dict[str, Any], request: Request, finish_reason: FinishRea
             prompt_tokens=_number(data_get(data, "usage.prompt_tokens")),
             completion_tokens=_number(data_get(data, "usage.completion_tokens")),
         ),
-        # `rate_limits` stays EMPTY. This port does not parse rate-limit
-        # headers on any provider -- prism-ts does, and that divergence is in
-        # the gaps register. Parsing them for Mistral alone would make one
-        # provider in this port answer a question the other two cannot.
-        meta=Meta(id=_string(data.get("id")), model=_string(data.get("model"))),
+        # Parsed from the response HEADERS by the provider and handed in --
+        # this function never sees an HTTP response, so it cannot read them
+        # itself, and a stored body still replays through the same path.
+        meta=Meta(
+            id=_string(data.get("id")),
+            model=_string(data.get("model")),
+            rate_limits=list(rate_limits),
+        ),
         messages=list(request.messages),
         system_prompts=list(request.system_prompts),
         additional_content=where_not_null({"thinking": extract_thinking(message)}),

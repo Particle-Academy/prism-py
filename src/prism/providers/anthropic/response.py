@@ -13,12 +13,16 @@ from prism.text.request import Request
 from prism.text.response import Response
 from prism.text.response_builder import ResponseBuilder
 from prism.text.step import Step
-from prism.value_objects import Meta, Usage
+from prism.value_objects import Meta, ProviderRateLimit, Usage
 
 __all__ = ["parse_text_response"]
 
 
-def parse_text_response(request: Request, raw_body: Mapping[str, Any]) -> Response:
+def parse_text_response(
+    request: Request,
+    raw_body: Mapping[str, Any],
+    rate_limits: Sequence[ProviderRateLimit] = (),
+) -> Response:
     """Parse a raw Messages body, with no HTTP involved.
 
     :raises PrismError: ``provider_response_error`` when the body is empty or
@@ -40,7 +44,7 @@ def parse_text_response(request: Request, raw_body: Mapping[str, Any]) -> Respon
         )
 
     builder = ResponseBuilder()
-    builder.add_step(_build_step(raw_body, request, finish_reason))
+    builder.add_step(_build_step(raw_body, request, finish_reason, rate_limits))
 
     return builder.to_response()
 
@@ -60,7 +64,12 @@ def _validate(data: Mapping[str, Any]) -> None:
         )
 
 
-def _build_step(data: Mapping[str, Any], request: Request, finish_reason: FinishReason) -> Step:
+def _build_step(
+    data: Mapping[str, Any],
+    request: Request,
+    finish_reason: FinishReason,
+    rate_limits: Sequence[ProviderRateLimit],
+) -> Step:
     content: Sequence[Mapping[str, Any]] = data_get(data, "content", []) or []
 
     return Step(
@@ -75,7 +84,7 @@ def _build_step(data: Mapping[str, Any], request: Request, finish_reason: Finish
         meta=Meta(
             id=data_get(data, "id", ""),
             model=data_get(data, "model", ""),
-            rate_limits=[],
+            rate_limits=list(rate_limits),
             service_tier=None,
         ),
         messages=list(request.messages),

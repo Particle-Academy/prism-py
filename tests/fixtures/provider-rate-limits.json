@@ -1,0 +1,798 @@
+{
+    "suite": "provider-rate-limits",
+    "schema_version": 1,
+    "corpus_version": "0.1.0",
+    "generated_by": "tools/generate-provider-rate-limits.php (php), tools/record-provider-rate-limits.mjs (ts), tools/record_provider_rate_limits.py (py)",
+    "scope": "Turning one provider's RESPONSE HEADERS into rate-limit buckets, for the three providers every port implements. NOT the request side, NOT retry or back-off policy, NOT the 429 error path -- a rate-limited request raises before any of this runs -- and NOT streaming, whose headers arrive on a response this parser never sees.",
+    "encoding": "utf-8",
+    "recorded": "Each row records the OUTCOME (ok or raised) and, when ok, every bucket as its own value object serialises it: name, limit, remaining, resets_at. Buckets are recorded IN ORDER, because the order is part of the answer. A raised outcome carries no class and no message, per 0004: only the fact that an unparseable header aborted the parse is contract.",
+    "clock": "Every row freezes now at 1787656500 (2026-08-25T11:15:00Z). Two of the three providers report a reset as a DURATION, so without a frozen clock the three languages would be compared while each held a different instant and every such row would disagree for a reason that is not a divergence.",
+    "cases": [
+        {
+            "id": "prl-0001",
+            "title": "the four buckets Anthropic reports today, in the order they arrived",
+            "since": "0.1.0",
+            "notes": "The control. Every bucket is complete and every reset is an RFC 3339 instant. If this row disagrees the reader is wrong at the top and every row below it is noise. It also pins ORDER: nothing errors when two languages order the list differently, a caller reading rate_limits[0] simply gets a different bucket.",
+            "given": {
+                "provider": "anthropic",
+                "now": 1787656500,
+                "headers": {
+                    "anthropic-ratelimit-requests-limit": "1000",
+                    "anthropic-ratelimit-requests-remaining": "500",
+                    "anthropic-ratelimit-requests-reset": "2026-08-25T11:15:30Z",
+                    "anthropic-ratelimit-input-tokens-limit": "80000",
+                    "anthropic-ratelimit-input-tokens-remaining": "0",
+                    "anthropic-ratelimit-input-tokens-reset": "2026-08-25T11:16:00Z",
+                    "anthropic-ratelimit-output-tokens-limit": "16000",
+                    "anthropic-ratelimit-output-tokens-remaining": "15000",
+                    "anthropic-ratelimit-output-tokens-reset": "2026-08-25T11:15:05Z",
+                    "anthropic-ratelimit-tokens-limit": "96000",
+                    "anthropic-ratelimit-tokens-remaining": "15000",
+                    "anthropic-ratelimit-tokens-reset": "2026-08-25T11:15:05Z"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": "2026-08-25T11:15:30+00:00"
+                        },
+                        {
+                            "name": "input-tokens",
+                            "limit": 80000,
+                            "remaining": 0,
+                            "resets_at": "2026-08-25T11:16:00+00:00"
+                        },
+                        {
+                            "name": "output-tokens",
+                            "limit": 16000,
+                            "remaining": 15000,
+                            "resets_at": "2026-08-25T11:15:05+00:00"
+                        },
+                        {
+                            "name": "tokens",
+                            "limit": 96000,
+                            "remaining": 15000,
+                            "resets_at": "2026-08-25T11:15:05+00:00"
+                        }
+                    ]
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": "2026-08-25T11:15:30+00:00"
+                        },
+                        {
+                            "name": "tokens",
+                            "limit": 96000,
+                            "remaining": 15000,
+                            "resets_at": "2026-08-25T11:15:05+00:00"
+                        },
+                        {
+                            "name": "input-tokens",
+                            "limit": 80000,
+                            "remaining": 0,
+                            "resets_at": "2026-08-25T11:16:00+00:00"
+                        },
+                        {
+                            "name": "output-tokens",
+                            "limit": 16000,
+                            "remaining": 15000,
+                            "resets_at": "2026-08-25T11:15:05+00:00"
+                        }
+                    ]
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": "2026-08-25T11:15:30+00:00"
+                        },
+                        {
+                            "name": "input-tokens",
+                            "limit": 80000,
+                            "remaining": 0,
+                            "resets_at": "2026-08-25T11:16:00+00:00"
+                        },
+                        {
+                            "name": "output-tokens",
+                            "limit": 16000,
+                            "remaining": 15000,
+                            "resets_at": "2026-08-25T11:15:05+00:00"
+                        },
+                        {
+                            "name": "tokens",
+                            "limit": 96000,
+                            "remaining": 15000,
+                            "resets_at": "2026-08-25T11:15:05+00:00"
+                        }
+                    ]
+                }
+            },
+            "agrees": false
+        },
+        {
+            "id": "prl-0002",
+            "title": "a reset sent as a unix epoch rather than a timestamp",
+            "since": "0.1.0",
+            "notes": "The reference has a test named for this exact shape, so it is a form the provider has really sent. A language whose date constructor only understands strings reports no reset at all here -- not an error, just a caller who never learns when the quota returns and therefore retries whenever it likes.",
+            "given": {
+                "provider": "anthropic",
+                "now": 1787656500,
+                "headers": {
+                    "anthropic-ratelimit-requests-limit": "1000",
+                    "anthropic-ratelimit-requests-remaining": "500",
+                    "anthropic-ratelimit-requests-reset": "1735689600"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": "2025-01-01T00:00:00+00:00"
+                        }
+                    ]
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": null
+                        }
+                    ]
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": "2025-01-01T00:00:00+00:00"
+                        }
+                    ]
+                }
+            },
+            "agrees": false
+        },
+        {
+            "id": "prl-0003",
+            "title": "a bucket nobody enumerated",
+            "since": "0.1.0",
+            "notes": "Anthropic meters web search separately. A reader that walks the prefix reports it without anyone editing a list; a reader that enumerates four names cannot see it and returns nothing, which is indistinguishable from a response that carried no quota at all.",
+            "given": {
+                "provider": "anthropic",
+                "now": 1787656500,
+                "headers": {
+                    "anthropic-ratelimit-web-search-requests-limit": "60",
+                    "anthropic-ratelimit-web-search-requests-remaining": "59",
+                    "anthropic-ratelimit-web-search-requests-reset": "2026-08-25T11:16:00Z"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "web-search-requests",
+                            "limit": 60,
+                            "remaining": 59,
+                            "resets_at": "2026-08-25T11:16:00+00:00"
+                        }
+                    ]
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": []
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "web-search-requests",
+                            "limit": 60,
+                            "remaining": 59,
+                            "resets_at": "2026-08-25T11:16:00+00:00"
+                        }
+                    ]
+                }
+            },
+            "agrees": false
+        },
+        {
+            "id": "prl-0004",
+            "title": "a bucket whose limit arrived and whose remaining did not",
+            "since": "0.1.0",
+            "notes": "A partial header set is a real thing on a truncated or proxied response. Reporting the bucket with a null remaining says what is known; dropping the bucket says the provider was silent, and reporting the missing half as zero would say the quota is exhausted when nothing said so.",
+            "given": {
+                "provider": "anthropic",
+                "now": 1787656500,
+                "headers": {
+                    "anthropic-ratelimit-tokens-limit": "96000",
+                    "anthropic-ratelimit-tokens-reset": "2026-08-25T11:16:00Z"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "tokens",
+                            "limit": 96000,
+                            "remaining": null,
+                            "resets_at": "2026-08-25T11:16:00+00:00"
+                        }
+                    ]
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": []
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "tokens",
+                            "limit": 96000,
+                            "remaining": null,
+                            "resets_at": "2026-08-25T11:16:00+00:00"
+                        }
+                    ]
+                }
+            },
+            "agrees": false
+        },
+        {
+            "id": "prl-0005",
+            "title": "a reset carrying an offset that is not UTC",
+            "since": "0.1.0",
+            "notes": "One instant, three possible renderings. A language that preserves the wire offset and one that normalises to UTC store DIFFERENT BYTES for the same moment, so a record written by one and compared by another differs while both are right about the time. This row exists to make that choice explicit rather than discovered.",
+            "given": {
+                "provider": "anthropic",
+                "now": 1787656500,
+                "headers": {
+                    "anthropic-ratelimit-requests-limit": "1000",
+                    "anthropic-ratelimit-requests-remaining": "500",
+                    "anthropic-ratelimit-requests-reset": "2026-08-25T13:15:00+02:00"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": "2026-08-25T13:15:00+02:00"
+                        }
+                    ]
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": "2026-08-25T11:15:00+00:00"
+                        }
+                    ]
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": "2026-08-25T11:15:00+00:00"
+                        }
+                    ]
+                }
+            },
+            "agrees": false
+        },
+        {
+            "id": "prl-0006",
+            "title": "a reset a proxy mangled into something unparseable",
+            "since": "0.1.0",
+            "notes": "ADVERSARIAL. A header is chosen by whatever sits in front of the provider, not by the provider alone. If an invalid reset raises, one malformed header aborts the parse of an already-paid-for completion -- a denial of the response from a field nobody validates. The safe answer is no known reset.",
+            "given": {
+                "provider": "anthropic",
+                "now": 1787656500,
+                "headers": {
+                    "anthropic-ratelimit-requests-limit": "1000",
+                    "anthropic-ratelimit-requests-remaining": "500",
+                    "anthropic-ratelimit-requests-reset": "soon"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "raised",
+                    "buckets": null
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": null
+                        }
+                    ]
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": null
+                        }
+                    ]
+                }
+            },
+            "agrees": false
+        },
+        {
+            "id": "prl-0007",
+            "title": "a limit that is not a number",
+            "since": "0.1.0",
+            "notes": "ADVERSARIAL, and the mirror of the row above: an invalid COUNT must not raise either. Both references collapse it to zero, which is a lie a caller can survive; raising is not.",
+            "given": {
+                "provider": "anthropic",
+                "now": 1787656500,
+                "headers": {
+                    "anthropic-ratelimit-requests-limit": "many",
+                    "anthropic-ratelimit-requests-remaining": "500"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 0,
+                            "remaining": 500,
+                            "resets_at": null
+                        }
+                    ]
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 0,
+                            "remaining": 500,
+                            "resets_at": null
+                        }
+                    ]
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 0,
+                            "remaining": 500,
+                            "resets_at": null
+                        }
+                    ]
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "prl-0008",
+            "title": "header names a proxy title-cased",
+            "since": "0.1.0",
+            "notes": "ADVERSARIAL. HTTP field names are case-insensitive (RFC 9110 5.1) and a title-casing proxy is ordinary rather than hostile. A case-sensitive prefix match reports NO rate limits here, and cannot be told apart from a response that legitimately carried none -- the failure is invisible at the moment it happens and permanent afterwards.",
+            "given": {
+                "provider": "anthropic",
+                "now": 1787656500,
+                "headers": {
+                    "Anthropic-RateLimit-Requests-Limit": "1000",
+                    "Anthropic-RateLimit-Requests-Remaining": "500",
+                    "Anthropic-RateLimit-Requests-Reset": "2026-08-25T11:15:30Z"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": []
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": []
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": "2026-08-25T11:15:30+00:00"
+                        }
+                    ]
+                }
+            },
+            "agrees": false
+        },
+        {
+            "id": "prl-0009",
+            "title": "a response that carried no rate-limit headers at all",
+            "since": "0.1.0",
+            "notes": "The other control. Silence must read as silence: an empty list, not a bucket invented from absent headers.",
+            "given": {
+                "provider": "anthropic",
+                "now": 1787656500,
+                "headers": {
+                    "content-type": "application/json"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": []
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": []
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": []
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "prl-0010",
+            "title": "both OpenAI buckets, with resets given as durations",
+            "since": "0.1.0",
+            "notes": "OpenAI sends a DURATION from now, not an instant, so the answer depends on the clock -- which is why every row here freezes it. A parser that reads the clock itself cannot be pinned by a fixture and would compare three languages each holding a different now.",
+            "given": {
+                "provider": "openai",
+                "now": 1787656500,
+                "headers": {
+                    "x-ratelimit-limit-requests": "10000",
+                    "x-ratelimit-remaining-requests": "9999",
+                    "x-ratelimit-reset-requests": "6ms",
+                    "x-ratelimit-limit-tokens": "200000",
+                    "x-ratelimit-remaining-tokens": "199000",
+                    "x-ratelimit-reset-tokens": "1h"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 10000,
+                            "remaining": 9999,
+                            "resets_at": "2026-08-25T11:15:00+00:00"
+                        },
+                        {
+                            "name": "tokens",
+                            "limit": 200000,
+                            "remaining": 199000,
+                            "resets_at": "2026-08-25T12:15:00+00:00"
+                        }
+                    ]
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 10000,
+                            "remaining": 9999,
+                            "resets_at": "2026-08-25T11:15:00+00:00"
+                        },
+                        {
+                            "name": "tokens",
+                            "limit": 200000,
+                            "remaining": 199000,
+                            "resets_at": "2026-08-25T12:15:00+00:00"
+                        }
+                    ]
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 10000,
+                            "remaining": 9999,
+                            "resets_at": "2026-08-25T11:15:00+00:00"
+                        },
+                        {
+                            "name": "tokens",
+                            "limit": 200000,
+                            "remaining": 199000,
+                            "resets_at": "2026-08-25T12:15:00+00:00"
+                        }
+                    ]
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "prl-0011",
+            "title": "a reset of zero",
+            "since": "0.1.0",
+            "notes": "Zero is treated as absent rather than as reset-now by both references. A zero-second reset would send a caller straight back into the same limit, which is the one behaviour a rate-limit field must not encourage.",
+            "given": {
+                "provider": "openai",
+                "now": 1787656500,
+                "headers": {
+                    "x-ratelimit-limit-tokens": "200000",
+                    "x-ratelimit-remaining-tokens": "0",
+                    "x-ratelimit-reset-tokens": "0"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "tokens",
+                            "limit": 200000,
+                            "remaining": 0,
+                            "resets_at": null
+                        }
+                    ]
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "tokens",
+                            "limit": 200000,
+                            "remaining": 0,
+                            "resets_at": null
+                        }
+                    ]
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "tokens",
+                            "limit": 200000,
+                            "remaining": 0,
+                            "resets_at": null
+                        }
+                    ]
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "prl-0012",
+            "title": "the compound duration OpenAI really sends",
+            "since": "0.1.0",
+            "notes": "ADVERSARIAL toward the corpus itself rather than toward an implementation: 1m30s is a form the service emits and NEITHER reference matches, because both anchor the pattern at both ends. The row records agreement on a gap, which is the case a cross-language corpus is blind to by construction and has to be written deliberately.",
+            "given": {
+                "provider": "openai",
+                "now": 1787656500,
+                "headers": {
+                    "x-ratelimit-limit-tokens": "200000",
+                    "x-ratelimit-remaining-tokens": "1000",
+                    "x-ratelimit-reset-tokens": "1m30s"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "tokens",
+                            "limit": 200000,
+                            "remaining": 1000,
+                            "resets_at": null
+                        }
+                    ]
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "tokens",
+                            "limit": 200000,
+                            "remaining": 1000,
+                            "resets_at": null
+                        }
+                    ]
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "tokens",
+                            "limit": 200000,
+                            "remaining": 1000,
+                            "resets_at": null
+                        }
+                    ]
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "prl-0013",
+            "title": "an OpenAI bucket whose remaining never arrived",
+            "since": "0.1.0",
+            "notes": "The same partial header set as prl-0004, on the provider whose reader demands both halves. Two providers in one reference answering the same question differently is worth a row of its own.",
+            "given": {
+                "provider": "openai",
+                "now": 1787656500,
+                "headers": {
+                    "x-ratelimit-limit-tokens": "200000",
+                    "x-ratelimit-reset-tokens": "30s"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": []
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": []
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": []
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "prl-0014",
+            "title": "Mistral's size-metered bucket, as the service actually names it",
+            "since": "0.1.0",
+            "notes": "ratelimitbysize-limit, with NO bucket segment -- the spelling the reference reads and the spelling its own tests assert against. A reader expecting a per-bucket suffix returns nothing for a real response, which reads exactly like a provider that sent no quota headers.",
+            "given": {
+                "provider": "mistral",
+                "now": 1787656500,
+                "headers": {
+                    "ratelimitbysize-limit": "500000",
+                    "ratelimitbysize-remaining": "499900",
+                    "ratelimitbysize-reset": "28"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "tokens",
+                            "limit": 500000,
+                            "remaining": 499900,
+                            "resets_at": "2026-08-25T11:15:28+00:00"
+                        }
+                    ]
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": []
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "tokens",
+                            "limit": 500000,
+                            "remaining": 499900,
+                            "resets_at": "2026-08-25T11:15:28+00:00"
+                        }
+                    ]
+                }
+            },
+            "agrees": false
+        },
+        {
+            "id": "prl-0015",
+            "title": "a Mistral response that carried no rate-limit headers",
+            "since": "0.1.0",
+            "notes": "ADVERSARIAL toward the reference. Casting an absent header to an integer yields a bucket reading limit 0, remaining 0, resets now: a provider that said nothing, reported as exhausted and ready to retry immediately. A caller cannot tell that apart from real exhaustion, and both readings of it are wrong.",
+            "given": {
+                "provider": "mistral",
+                "now": 1787656500,
+                "headers": {
+                    "content-type": "application/json"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "tokens",
+                            "limit": 0,
+                            "remaining": 0,
+                            "resets_at": "2026-08-25T11:15:00+00:00"
+                        }
+                    ]
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": []
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": []
+                }
+            },
+            "agrees": false
+        },
+        {
+            "id": "prl-0016",
+            "title": "a prefixed header with no bucket segment at all",
+            "since": "0.1.0",
+            "notes": "ADVERSARIAL and malformed. anthropic-ratelimit-limit has a field and no bucket. The reference's beforeLast/afterLast both return the whole string when the delimiter is missing, so it becomes a bucket NAMED limit carrying a limit field. Reachable from one bad header, so the ports agree with it rather than tidying it into a different answer.",
+            "given": {
+                "provider": "anthropic",
+                "now": 1787656500,
+                "headers": {
+                    "anthropic-ratelimit-limit": "1000"
+                }
+            },
+            "result": {
+                "php": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "limit",
+                            "limit": 1000,
+                            "remaining": null,
+                            "resets_at": null
+                        }
+                    ]
+                },
+                "ts": {
+                    "outcome": "ok",
+                    "buckets": []
+                },
+                "py": {
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "limit",
+                            "limit": 1000,
+                            "remaining": null,
+                            "resets_at": null
+                        }
+                    ]
+                }
+            },
+            "agrees": false
+        }
+    ]
+}

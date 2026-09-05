@@ -18,6 +18,7 @@ from prism.value_objects.messages import (
     message_from_dict,
 )
 from prism.value_objects.meta import Meta
+from prism.value_objects.provider_rate_limit import ProviderRateLimit
 from prism.value_objects.provider_tool import ProviderTool
 from prism.value_objects.provider_tool_call import ProviderToolCall
 from prism.value_objects.tool_call import ToolCall
@@ -29,6 +30,7 @@ __all__ = [
     "Message",
     "Meta",
     "Part",
+    "ProviderRateLimit",
     "ProviderTool",
     "ProviderToolCall",
     "SystemMessage",

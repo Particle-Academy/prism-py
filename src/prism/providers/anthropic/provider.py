@@ -18,6 +18,7 @@ from prism.http import (
     UrllibStreamTransport,
     UrllibTransport,
 )
+from prism.providers.anthropic.rate_limits import parse_rate_limits
 from prism.providers.anthropic.request_body import build_request_body
 from prism.providers.anthropic.response import parse_text_response
 from prism.providers.anthropic.stream_events import AnthropicStreamMapper
@@ -101,7 +102,7 @@ class Anthropic(Provider):
                 body=response.body.decode("utf-8", errors="replace"),
             )
 
-        return parse_text_response(request, decoded)
+        return parse_text_response(request, decoded, parse_rate_limits(response.headers))
 
     def stream(self, request: Request) -> Iterator[StreamEvent]:
         """The same generation, delivered as it arrives.

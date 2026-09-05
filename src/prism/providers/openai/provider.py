@@ -71,6 +71,7 @@ from prism.providers.openai.files import (
 )
 from prism.providers.openai.images import build_images_body, parse_images_response
 from prism.providers.openai.moderation import build_moderation_body, parse_moderation_response
+from prism.providers.openai.rate_limits import parse_rate_limits
 from prism.providers.openai.request_body import build_request_body
 from prism.providers.openai.response import parse_text_response
 from prism.providers.openai.stream_events import map_stream_event
@@ -560,7 +561,7 @@ class OpenAI(Provider):
                 body=response.body.decode("utf-8", errors="replace"),
             )
 
-        return parse_text_response(request, decoded)
+        return parse_text_response(request, decoded, parse_rate_limits(response.headers))
 
     def structured(self, request: StructuredRequest) -> StructuredResponse:
         """Structured output through the Responses API's schema format.

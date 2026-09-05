@@ -28,6 +28,7 @@ from prism.http import (
 from prism.providers.base import Provider
 from prism.providers.mistral.embeddings import build_embeddings_body, parse_embeddings_response
 from prism.providers.mistral.fim import parse_fim_response
+from prism.providers.mistral.rate_limits import parse_rate_limits
 from prism.providers.mistral.request_body import (
     build_fim_body,
     build_request_body,
@@ -86,9 +87,9 @@ class Mistral(Provider):
         self._stream_transport: StreamTransport = stream_transport or UrllibStreamTransport()
 
     def text(self, request: Request) -> Response:
-        return parse_text_response(
-            request, self._post("chat/completions", build_request_body(request))
-        )
+        decoded, headers = self._send("chat/completions", build_request_body(request))
+
+        return parse_text_response(request, decoded, parse_rate_limits(headers))
 
     def structured(self, request: StructuredRequest) -> StructuredResponse:
         """Structured output through Mistral's OWN strict schema mode.
@@ -98,9 +99,11 @@ class Mistral(Provider):
         records that ``structured`` means different things per provider; Mistral
         lands on the strong side of it.
         """
-        decoded = self._post("chat/completions", build_structured_body(request))
+        decoded, headers = self._send("chat/completions", build_structured_body(request))
 
-        return structured_from_text_response(parse_text_response(request, decoded))
+        return structured_from_text_response(
+            parse_text_response(request, decoded, parse_rate_limits(headers))
+        )
 
     def fim(self, request: FimRequest) -> FimResponse:
         """Fill in the middle: a prefix, an optional suffix, and the gap.
@@ -200,6 +203,17 @@ class Mistral(Provider):
     # -- internals ---------------------------------------------------------
 
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """The body alone, for the paths that carry no quota metadata."""
+        return self._send(path, payload)[0]
+
+    def _send(self, path: str, payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
+        """The decoded body AND the response headers.
+
+        Two methods rather than one returning a tuple everywhere: only the text
+        and structured paths read rate-limit headers, and widening every caller
+        to a tuple it discards would put the headers in reach of code that has
+        no business with them.
+        """
         body = canonical.encode(payload).encode("utf-8")
 
         response = self._transport.send(
@@ -221,7 +235,7 @@ class Mistral(Provider):
                 body=response.body.decode("utf-8", errors="replace"),
             )
 
-        return decoded
+        return decoded, response.headers
 
     def _headers(self, content_length: int) -> dict[str, str]:
         """A bearer token, like OpenAI and unlike Anthropic's ``x-api-key``."""
