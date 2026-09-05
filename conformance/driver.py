@@ -17,6 +17,7 @@ from conformance import mutations
 from prism import canonical
 from prism.enums import ToolChoice
 from prism.errors import PrismError
+from prism.providers.anthropic import parse_text_response as parse_anthropic_text_response
 from prism.providers.openai import build_request_body, parse_text_response
 from prism.schema import BooleanSchema, NumberSchema, Schema, StringSchema
 from prism.text import PendingRequest
@@ -178,9 +179,34 @@ def _run_request_payload(case: Mapping[str, Any], mutation: mutations.Mutation) 
     return [(case["expect"]["body_json"], canonical.encode(_request_body(case, mutation)))]
 
 
+def _parser_for(script: Sequence[Mapping[str, Any]]) -> Any:
+    """The parser for the provider a case's builder names.
+
+    Read from the SCRIPT rather than from the built request, so all three
+    languages answer this the same way: a request object exposes its provider
+    differently in each, and the script is the one shared artifact.
+
+    This assumed OpenAI until 2026-09-05, which is the mechanical reason no
+    Anthropic row could exist in the corpus -- and therefore why G-48, reasoning
+    tokens dropped in all three languages, was invisible to every cross-language
+    check that existed.
+    """
+    provider = next(
+        (step.get("args", [None])[0] for step in script if step.get("call") == "using"),
+        None,
+    )
+
+    if provider == "openai":
+        return parse_text_response
+    if provider == "anthropic":
+        return parse_anthropic_text_response
+
+    raise DriverError(f"No response-parse handler wired for provider {provider!r}.")
+
+
 def _run_response_parse(case: Mapping[str, Any], mutation: mutations.Mutation) -> list[Attempt]:
     request = build_pending(case["builder"]).to_request()
-    parsed = parse_text_response(request, case["response"])
+    parsed = _parser_for(case["builder"])(request, case["response"])
 
     return [(case["expect"]["result_json"], canonical.encode(mutation.parsed(parsed.to_dict())))]
 
