@@ -90,6 +90,9 @@ class AnthropicStreamMapper:
             self._usage = Usage(
                 prompt_tokens=_int(usage.get("input_tokens")),
                 completion_tokens=_int(usage.get("output_tokens")),
+                cache_write_input_tokens=usage.get("cache_creation_input_tokens"),
+                cache_read_input_tokens=usage.get("cache_read_input_tokens"),
+                thought_tokens=data_get(usage, "output_tokens_details.thinking_tokens"),
             )
 
         return StreamStartEvent(model=_str(data_get(payload, "message.model")))
@@ -158,9 +161,25 @@ class AnthropicStreamMapper:
         usage = payload.get("usage")
 
         if isinstance(usage, dict):
+            # Rebuilt rather than mutated, so anything not restated here would
+            # be LOST. Prompt tokens were already carried forward for exactly
+            # that reason; cache and thinking counts arrive at message_start and
+            # never again, so they need the same carry.
+            carried = self._usage
+            thinking = data_get(usage, "output_tokens_details.thinking_tokens")
+
             self._usage = Usage(
-                prompt_tokens=self._usage.prompt_tokens if self._usage else 0,
+                prompt_tokens=carried.prompt_tokens if carried else 0,
                 completion_tokens=_int(usage.get("output_tokens")),
+                cache_write_input_tokens=carried.cache_write_input_tokens if carried else None,
+                cache_read_input_tokens=carried.cache_read_input_tokens if carried else None,
+                # `if thinking is None` rather than `or`: Python's `or` treats 0
+                # as absent, so a model that reported ZERO thinking tokens would
+                # silently inherit the previous count. PHP's `??` and the TS
+                # `??` both keep the zero, and this has to agree with them.
+                thought_tokens=(carried.thought_tokens if carried else None)
+                if thinking is None
+                else thinking,
             )
 
     def _finish_reason(self) -> FinishReason:

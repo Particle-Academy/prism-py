@@ -132,5 +132,9 @@ def _build_usage(data: Mapping[str, Any]) -> Usage:
         completion_tokens=data_get(data, "usage.output_tokens", 0),
         cache_write_input_tokens=data_get(data, "usage.cache_creation_input_tokens"),
         cache_read_input_tokens=data_get(data, "usage.cache_read_input_tokens"),
-        thought_tokens=None,
+        # Reasoning tokens, and a BREAKDOWN of completion_tokens rather than an
+        # addition to them. Reported by the Moic Suite team against the live
+        # API; this was hardcoded to None, and the other two languages simply
+        # never set it -- so all three agreed, and agreement is not correctness.
+        thought_tokens=data_get(data, "usage.output_tokens_details.thinking_tokens"),
     )

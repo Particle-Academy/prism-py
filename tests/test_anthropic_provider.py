@@ -159,6 +159,54 @@ def test_reports_cache_tokens_without_subtracting_them() -> None:
     assert response.usage.cache_read_input_tokens == 7
 
 
+def test_reports_the_thinking_tokens_anthropic_sends() -> None:
+    # Reported by the Moic Suite team against the live API. Anthropic puts
+    # reasoning at usage.output_tokens_details.thinking_tokens, and this mapping
+    # hardcoded thought_tokens=None -- while PHP and TypeScript simply never set
+    # it. All three agreed, so no cross-language check could see it.
+    #
+    # The numbers matter as much as the field: 1240 thinking tokens INSIDE 2820
+    # output tokens. A consumer pricing completion + thought bills the reasoning
+    # twice, which is the expensive half.
+    body = _ok_body()
+    body["usage"] = {
+        "input_tokens": 11,
+        "output_tokens": 2820,
+        "output_tokens_details": {"thinking_tokens": 1240},
+    }
+    transport = RecordingTransport(body)
+
+    response = (
+        Prism.text()
+        .using("anthropic", "claude-sonnet-4-5", {"transport": transport})
+        .with_prompt("Hi")
+        .as_text()
+    )
+
+    assert response.usage.thought_tokens == 1240
+    assert response.usage.completion_tokens == 2820
+    # The breakdown claim, asserted rather than left to the comment.
+    assert response.usage.thought_tokens < response.usage.completion_tokens
+
+
+def test_leaves_thought_tokens_none_when_anthropic_reports_no_thinking() -> None:
+    # The control. Without it the test above passes against a mapping that
+    # hardcodes 1240, or one that invents a number when none was sent -- which
+    # would make "the model did not reason" unreadable.
+    body = _ok_body()
+    body["usage"] = {"input_tokens": 11, "output_tokens": 2820}
+    transport = RecordingTransport(body)
+
+    response = (
+        Prism.text()
+        .using("anthropic", "claude-sonnet-4-5", {"transport": transport})
+        .with_prompt("Hi")
+        .as_text()
+    )
+
+    assert response.usage.thought_tokens is None
+
+
 def test_raises_on_an_error_body_even_with_a_success_status() -> None:
     # Anthropic reports some failures with type: "error" and a 200.
     transport = RecordingTransport(
