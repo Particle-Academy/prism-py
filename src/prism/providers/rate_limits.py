@@ -16,6 +16,8 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
+from prism.http import fold_header_name
+
 __all__ = ["header_int", "lowercased"]
 
 #: A leading integer, the way both references read one. PHP's ``(int)`` cast and
@@ -43,15 +45,21 @@ def header_int(value: str | None) -> int:
 
 
 def lowercased(headers: Mapping[str, str]) -> dict[str, str]:
-    """The headers with lower-cased names.
+    """The headers re-keyed by ASCII-folded name, values untouched.
 
     HTTP field names are case-insensitive (RFC 9110 §5.1), and a proxy that
-    title-cases them is ordinary rather than hostile. **The reference matches
-    its prefix case-sensitively**, so one such proxy makes it report no rate
-    limits at all — silently, since an empty list is what a response without
-    the headers legitimately looks like. This port's transport already
-    lower-cases, so this is belt and braces for a caller passing headers from
-    somewhere else; it costs one dict comprehension and removes a failure that
-    is invisible when it happens.
+    title-cases them is ordinary rather than hostile. Both references used to
+    match their prefix case-sensitively, so one such proxy made them report no
+    rate limits at all — silently, since an empty list is what a response
+    without the headers legitimately looks like. Fixed in all three languages on
+    2026-09-05; this port had it from the start.
+
+    The fold is :func:`~prism.http.fold_header_name`, which is ASCII-only and
+    deliberately not :meth:`str.lower` — see its note for the codepoints that
+    would otherwise let a lookalike name be read as a real bucket.
+
+    Insertion order survives, and it matters: Anthropic's reader names its
+    buckets in header order, so a fold that re-ordered the map would hand a
+    caller reading ``rate_limits[0]`` a different bucket.
     """
-    return {name.lower(): value for name, value in headers.items()}
+    return {fold_header_name(name): value for name, value in headers.items()}

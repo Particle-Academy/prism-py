@@ -10,8 +10,14 @@ has lifted.
 This suite was written while closing G-15 -- this port had no rate-limit reader
 at all -- and its first run found that the two REFERENCES disagree with each
 other on nine of sixteen rows, which the register had not predicted. Ten rows
-disagree in total. They are recorded rather than reconciled, and pinned here so
-that closing any of them is a deliberate act.
+disagreed in total; SEVEN do now. They are recorded rather than reconciled, and
+pinned here so that closing any of them is a deliberate act.
+
+Three closed, and this column moved for none of them: prism-ts learned the names
+Mistral actually sends (G-41), and both references learned to compare a field
+name case-insensitively (G-43, prl-0008) and to keep a response whose reset
+header it cannot read (G-43, prl-0006). This port had all three from the start,
+which is what decision 0002 buys.
 
 Mirrors prism-ts/tests/rate-limits-corpus.test.ts case for case.
 """
@@ -81,9 +87,6 @@ def test_the_rows_that_disagree_are_the_ones_the_corpus_says_disagree() -> None:
         "prl-0003",
         "prl-0004",
         "prl-0005",
-        "prl-0006",
-        "prl-0008",
-        "prl-0014",
         "prl-0015",
         "prl-0016",
     ]
@@ -94,25 +97,43 @@ def test_follows_the_reference_where_the_reference_is_right() -> None:
     # malformed bucket name. On all four this port agrees with the reference and
     # prism-ts does not, so a future "tidy-up" toward the other port would be a
     # regression rather than a convergence.
-    for case_id in ("prl-0002", "prl-0003", "prl-0004", "prl-0014", "prl-0016"):
+    for case_id in ("prl-0002", "prl-0003", "prl-0004", "prl-0016"):
         case = next(entry for entry in CASES if entry["id"] == case_id)
         assert case["result"]["py"] == case["result"]["php"], case_id
         assert case["result"]["py"] != case["result"]["ts"], case_id
 
 
+def test_the_mistral_names_that_prism_ts_used_to_miss_now_agree_in_three() -> None:
+    # prl-0014 was the largest single disagreement in the suite: Mistral sends
+    # `ratelimitbysize-limit` with no bucket segment, prism-ts read
+    # `ratelimitbysize-limit-tokens`, and every Mistral call in that port
+    # therefore reported no quota at all. Closed in prism-ts (G-41) by moving to
+    # the names this port and the reference already read -- so this row is now
+    # evidence of convergence rather than of a gap, and it is asserted from the
+    # agreeing side so that a regression in either direction fails.
+    case = next(entry for entry in CASES if entry["id"] == "prl-0014")
+
+    assert case["agrees"] is True
+    assert case["result"]["py"] == case["result"]["php"] == case["result"]["ts"]
+
+
 def test_diverges_from_the_reference_only_where_the_reference_is_wrong() -> None:
-    # Decision 0002: the port contract is the golden, not the defect. Four rows,
-    # each one a case where copying the reference would ship a defect:
+    # Decision 0002: the port contract is the golden, not the defect. Four rows
+    # started here; TWO remain, because on the other two the REFERENCE was
+    # brought to this port rather than the other way round.
     #
     #   prl-0005  the reference keeps the wire offset, so one instant stores as
     #             two different strings depending on who wrote the record
-    #   prl-0006  the reference RAISES on an unparseable reset, so one mangled
-    #             header aborts an already-paid-for completion
-    #   prl-0008  the reference matches its prefix case-sensitively, so a
-    #             title-casing proxy silently erases every rate limit
     #   prl-0015  the reference invents an exhausted bucket out of headers that
     #             were never sent
-    divergent = {"prl-0005", "prl-0006", "prl-0008", "prl-0015"}
+    #
+    # Closed in the reference, 2026-09-05 (G-43):
+    #
+    #   prl-0006  the reference RAISED on an unparseable reset, so one mangled
+    #             header aborted an already-paid-for completion
+    #   prl-0008  the reference matched its prefix case-sensitively, so a
+    #             title-casing proxy silently erased every rate limit
+    divergent = {"prl-0005", "prl-0015"}
 
     for case in CASES:
         agrees_with_reference = case["result"]["py"] == case["result"]["php"]

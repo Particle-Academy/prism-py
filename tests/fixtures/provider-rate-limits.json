@@ -315,7 +315,7 @@
             "id": "prl-0006",
             "title": "a reset a proxy mangled into something unparseable",
             "since": "0.1.0",
-            "notes": "ADVERSARIAL. A header is chosen by whatever sits in front of the provider, not by the provider alone. If an invalid reset raises, one malformed header aborts the parse of an already-paid-for completion -- a denial of the response from a field nobody validates. The safe answer is no known reset.",
+            "notes": "ADVERSARIAL. A header is chosen by whatever sits in front of the provider, not by the provider alone. If an invalid reset raises, one malformed header aborts the parse of an already-paid-for completion -- a denial of the response from a field nobody validates. The safe answer is no known reset. The reference DID raise here on this suite's first run, with both ports already correct; fixed in prism on 2026-09-05, so all three now keep the response.",
             "given": {
                 "provider": "anthropic",
                 "now": 1787656500,
@@ -327,8 +327,15 @@
             },
             "result": {
                 "php": {
-                    "outcome": "raised",
-                    "buckets": null
+                    "outcome": "ok",
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": null
+                        }
+                    ]
                 },
                 "ts": {
                     "outcome": "ok",
@@ -353,7 +360,7 @@
                     ]
                 }
             },
-            "agrees": false
+            "agrees": true
         },
         {
             "id": "prl-0007",
@@ -409,7 +416,7 @@
             "id": "prl-0008",
             "title": "header names a proxy title-cased",
             "since": "0.1.0",
-            "notes": "ADVERSARIAL. HTTP field names are case-insensitive (RFC 9110 5.1) and a title-casing proxy is ordinary rather than hostile. A case-sensitive prefix match reports NO rate limits here, and cannot be told apart from a response that legitimately carried none -- the failure is invisible at the moment it happens and permanent afterwards.",
+            "notes": "ADVERSARIAL. HTTP field names are case-insensitive (RFC 9110 5.1) and a title-casing proxy is ordinary rather than hostile. A case-sensitive prefix match reports NO rate limits here, and cannot be told apart from a response that legitimately carried none -- the failure is invisible at the moment it happens and permanent afterwards. All three languages read it now; prism-py always did, prism and prism-ts were brought to it on 2026-09-05 (G-43). WHAT THIS ROW CANNOT ASK is the other half of the fix: the fold has to be ASCII-ONLY, because mb_strtolower / toLowerCase / str.lower all turn U+212A KELVIN SIGN into a plain k and would read `anthropic-ratelimit-toKens-limit` as a `tokens` bucket the provider never sent, and turn U+0130 into two codepoints and change the length the bucket/field split is computed over. That case cannot be a row here: the reference's transport (Guzzle) rejects a field name outside the RFC 9110 token grammar before any reader sees it, so PHP would record the harness refusing rather than the reader answering. It is pinned per language instead -- prism tests/Support/HeaderNamesTest.php, prism-ts tests/rate-limit-headers.test.ts, prism-py tests/test_rate_limits.py.",
             "given": {
                 "provider": "anthropic",
                 "now": 1787656500,
@@ -422,11 +429,25 @@
             "result": {
                 "php": {
                     "outcome": "ok",
-                    "buckets": []
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": "2026-08-25T11:15:30+00:00"
+                        }
+                    ]
                 },
                 "ts": {
                     "outcome": "ok",
-                    "buckets": []
+                    "buckets": [
+                        {
+                            "name": "requests",
+                            "limit": 1000,
+                            "remaining": 500,
+                            "resets_at": "2026-08-25T11:15:30+00:00"
+                        }
+                    ]
                 },
                 "py": {
                     "outcome": "ok",
@@ -440,7 +461,7 @@
                     ]
                 }
             },
-            "agrees": false
+            "agrees": true
         },
         {
             "id": "prl-0009",
@@ -677,7 +698,7 @@
             "id": "prl-0014",
             "title": "Mistral's size-metered bucket, as the service actually names it",
             "since": "0.1.0",
-            "notes": "ratelimitbysize-limit, with NO bucket segment -- the spelling the reference reads and the spelling its own tests assert against. A reader expecting a per-bucket suffix returns nothing for a real response, which reads exactly like a provider that sent no quota headers.",
+            "notes": "ratelimitbysize-limit, with NO bucket segment -- the spelling the reference reads and the spelling its own tests assert against. A reader expecting a per-bucket suffix returns nothing for a real response, which reads exactly like a provider that sent no quota headers. prism-ts did exactly that until 2026-09-05 (G-41): it read ratelimitbysize-limit-tokens, so every Mistral call in that port reported no quota at all. Its own tests could not see it -- they fed the parser the names the parser expected -- and this row is the only thing that could.",
             "given": {
                 "provider": "mistral",
                 "now": 1787656500,
@@ -701,7 +722,14 @@
                 },
                 "ts": {
                     "outcome": "ok",
-                    "buckets": []
+                    "buckets": [
+                        {
+                            "name": "tokens",
+                            "limit": 500000,
+                            "remaining": 499900,
+                            "resets_at": "2026-08-25T11:15:28+00:00"
+                        }
+                    ]
                 },
                 "py": {
                     "outcome": "ok",
@@ -715,7 +743,7 @@
                     ]
                 }
             },
-            "agrees": false
+            "agrees": true
         },
         {
             "id": "prl-0015",

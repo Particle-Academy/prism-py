@@ -24,9 +24,36 @@ __all__ = [
     "Transport",
     "UrllibTransport",
     "encode_multipart",
+    "fold_header_name",
 ]
 
 DEFAULT_TIMEOUT = 30.0
+
+#: The 26 ASCII letters, and nothing else. **Deliberately not** :meth:`str.lower`
+#: or :meth:`str.casefold`, both of which are Unicode-aware: ``K`` (U+212A KELVIN
+#: SIGN) folds to a plain ``k``, so a field name carrying it would be compared as
+#: though it were the ASCII name the provider actually sends — and a rate-limit
+#: reader that derives a BUCKET NAME from the header would then manufacture a
+#: ``tokens`` bucket out of a header nobody sent. ``İ`` (U+0130) folds to TWO
+#: codepoints, changing the string's length under any offset arithmetic over it.
+#:
+#: An HTTP field name is an RFC 9110 ``token``: ASCII by grammar. A 1:1 map over
+#: the ASCII letters is both the correct fold and the only one ``prism`` (PHP)
+#: and ``prism-ts`` can reproduce byte for byte.
+_ASCII_FOLD = str.maketrans(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    "abcdefghijklmnopqrstuvwxyz",
+)
+
+
+def fold_header_name(name: str) -> str:
+    """One HTTP field name, folded to lower case as ASCII and nothing else.
+
+    Field names are case-insensitive (RFC 9110 §5.1), so every response header
+    is re-keyed through this before anything looks one up. See
+    :data:`_ASCII_FOLD` for why the fold is not :meth:`str.lower`.
+    """
+    return name.translate(_ASCII_FOLD)
 
 
 @dataclass(frozen=True)
@@ -78,13 +105,15 @@ class UrllibTransport:
                 return HttpResponse(
                     status=response.status,
                     body=response.read(),
-                    headers={key.lower(): value for key, value in response.headers.items()},
+                    headers={
+                        fold_header_name(key): value for key, value in response.headers.items()
+                    },
                 )
         except urllib.error.HTTPError as error:
             return HttpResponse(
                 status=error.code,
                 body=error.read(),
-                headers={key.lower(): value for key, value in error.headers.items()},
+                headers={fold_header_name(key): value for key, value in error.headers.items()},
             )
 
 
@@ -144,13 +173,13 @@ class UrllibStreamTransport:
             body = error.read()
             return HttpStreamResponse(
                 status=error.code,
-                headers={key.lower(): value for key, value in error.headers.items()},
+                headers={fold_header_name(key): value for key, value in error.headers.items()},
                 chunks=iter([body.decode("utf-8", errors="replace")]),
             )
 
         return HttpStreamResponse(
             status=response.status,
-            headers={key.lower(): value for key, value in response.headers.items()},
+            headers={fold_header_name(key): value for key, value in response.headers.items()},
             chunks=self._read(response),
         )
 

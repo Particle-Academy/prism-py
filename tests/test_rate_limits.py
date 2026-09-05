@@ -160,10 +160,11 @@ def test_a_limit_that_is_not_a_number_reads_as_zero_rather_than_raising() -> Non
 
 
 def test_matches_the_prefix_whatever_case_a_proxy_used() -> None:
-    # HTTP field names are case-insensitive. The reference compares its prefix
-    # case-sensitively, so one title-casing proxy makes it report no rate limits
-    # at all -- invisibly, since that is also what a response without the
-    # headers looks like.
+    # HTTP field names are case-insensitive (RFC 9110 5.1). Both references used
+    # to compare their prefix case-sensitively, so one title-casing proxy made
+    # them report no rate limits at all -- invisibly, since that is also what a
+    # response without the headers looks like. This port had it from the start;
+    # the other two were brought here on 2026-09-05.
     limits = anthropic_limits(
         {
             "Anthropic-RateLimit-Requests-Limit": "1000",
@@ -172,6 +173,30 @@ def test_matches_the_prefix_whatever_case_a_proxy_used() -> None:
     )
 
     assert limits == [ProviderRateLimit("requests", 1000, 500, None)]
+
+
+def test_the_fold_is_ascii_only_and_will_not_invent_a_bucket_from_a_lookalike() -> None:
+    # THE REASON THE FOLD IS NOT str.lower(). U+212A KELVIN SIGN lower-cases to a
+    # plain ASCII `k`, so this header would come back as a bucket named `tokens`
+    # -- the name a caller matches on to decide whether it has token quota left,
+    # manufactured out of a field the provider never sent. An HTTP field name is
+    # an RFC 9110 `token` and ASCII by grammar, so a name carrying this codepoint
+    # is a DIFFERENT name and stays one.
+    name = "anthropic-ratelimit-to\u212aens-limit"
+    assert name.lower() == "anthropic-ratelimit-tokens-limit"
+
+    assert _named(anthropic_limits({name: "96000"})) == ["to\u212aens"]
+
+
+def test_the_fold_never_changes_the_length_of_a_name() -> None:
+    # U+0130 lower-cases to TWO codepoints (`i` + U+0307), which would make the
+    # bucket name this reader derives a different string in each of the three
+    # languages implementing the parser -- a cross-language divergence produced
+    # by the fix rather than removed by it.
+    name = "anthropic-ratelimit-\u0130nput-tokens-limit"
+    assert len(name.lower()) > len(name)
+
+    assert _named(anthropic_limits({name: "80000"})) == ["\u0130nput-tokens"]
 
 
 def test_a_response_with_no_rate_limit_headers_reports_no_buckets() -> None:
