@@ -37,8 +37,9 @@ def parse_text_response(
     path a live call takes.
 
     :raises PrismError: ``provider_response_error`` when the payload is missing,
-        empty, or carries an error; ``max_tokens_exceeded`` when generation was
-        cut short; ``tool_loop_not_supported`` when it stopped on tool calls.
+        empty, or carries an error; ``tool_loop_not_supported`` when it stopped
+        on tool calls. A Length finish RETURNS the partial response rather than
+        raising -- see the note in the body.
     """
     data = validate_response(raw_body)
     finish_reason = map_finish_reason(data)
@@ -46,8 +47,27 @@ def parse_text_response(
     if finish_reason is FinishReason.TOOL_CALLS:
         raise PrismError.tool_loop_not_supported()
 
-    if finish_reason is FinishReason.LENGTH:
-        raise PrismError.max_tokens_exceeded("length", "chat.completion")
+    # A Length finish RETURNS the partial answer here, and does not raise.
+    #
+    # The reference's stance is per-PROVIDER rather than uniform, which is easy
+    # to misread: Anthropic and Mistral return, OpenAI's Responses handler and
+    # its structured handler raise, and Azure raises. This port previously
+    # raised for all three providers, so it matched the reference on OpenAI and
+    # diverged on the other two.
+    #
+    # Returning is the right behaviour to copy here. The model did write
+    # something usable and you paid for the tokens, and running out of room is
+    # exactly when the usage numbers matter most -- it is the expensive case and
+    # the unfinished one at once, so raising discards the reasoning-token count
+    # on the very call where a caller most wants it.
+    #
+    # The cost is real and is the caller's to manage: code that ignores
+    # finish_reason will treat a truncated answer as a complete one. That is why
+    # FinishReason.LENGTH is on the response rather than implied.
+    #
+    # Found by prism-parity's anthropic-text-response suite (G-50). The existing
+    # seventeen OpenAI rows never caught it because none of them sends a
+    # max_tokens finish.
 
     builder = ResponseBuilder()
     builder.add_step(_build_step(data, request, finish_reason, rate_limits))

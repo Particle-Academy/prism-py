@@ -26,10 +26,12 @@ def parse_text_response(
     """Parse a raw Messages body, with no HTTP involved.
 
     :raises PrismError: ``provider_response_error`` when the body is empty or
-        carries an error; ``max_tokens_exceeded`` when the model stopped at the
-        token limit; ``tool_loop_not_supported`` when it finished on tool use,
-        which this slice does not implement — better a clearly-coded refusal
-        than a half-executed loop.
+        carries an error; ``tool_loop_not_supported`` when it finished on tool
+        use, which this slice does not implement -- better a clearly-coded
+        refusal than a half-executed loop.
+
+    A Length finish does NOT raise. It returns the partial response with
+    ``finish_reason`` set, matching the reference; see the note in the body.
     """
     _validate(raw_body)
 
@@ -38,10 +40,27 @@ def parse_text_response(
     if finish_reason is FinishReason.TOOL_CALLS:
         raise PrismError.tool_loop_not_supported()
 
-    if finish_reason is FinishReason.LENGTH:
-        raise PrismError.max_tokens_exceeded(
-            data_get(raw_body, "stop_reason", ""), data_get(raw_body, "type", "")
-        )
+    # A Length finish RETURNS the partial answer here, and does not raise.
+    #
+    # The reference's stance is per-PROVIDER rather than uniform, which is easy
+    # to misread: Anthropic and Mistral return, OpenAI's Responses handler and
+    # its structured handler raise, and Azure raises. This port previously
+    # raised for all three providers, so it matched the reference on OpenAI and
+    # diverged on the other two.
+    #
+    # Returning is the right behaviour to copy here. The model did write
+    # something usable and you paid for the tokens, and running out of room is
+    # exactly when the usage numbers matter most -- it is the expensive case and
+    # the unfinished one at once, so raising discards the reasoning-token count
+    # on the very call where a caller most wants it.
+    #
+    # The cost is real and is the caller's to manage: code that ignores
+    # finish_reason will treat a truncated answer as a complete one. That is why
+    # FinishReason.LENGTH is on the response rather than implied.
+    #
+    # Found by prism-parity's anthropic-text-response suite (G-50). The existing
+    # seventeen OpenAI rows never caught it because none of them sends a
+    # max_tokens finish.
 
     builder = ResponseBuilder()
     builder.add_step(_build_step(raw_body, request, finish_reason, rate_limits))

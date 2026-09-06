@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from prism import HttpRequest, HttpResponse, Prism, PrismError, canonical
+from prism.enums import FinishReason
 from prism.providers.anthropic.provider import Anthropic
 
 
@@ -219,15 +220,37 @@ def test_raises_on_an_error_body_even_with_a_success_status() -> None:
         ).as_text()
 
 
-def test_raises_when_generation_was_cut_short() -> None:
+def test_a_truncated_generation_is_returned_not_raised() -> None:
+    # A Length finish RETURNS the partial answer, matching the reference. This
+    # test asserted the opposite until 2026-09-06 (G-50): both ports raised for
+    # every provider, which matched the reference on OpenAI and diverged from it
+    # on Anthropic and Mistral.
+    #
+    # The text and the usage are the point. The model wrote something usable and
+    # the tokens were paid for, and running out of room is exactly when the usage
+    # numbers matter most -- so raising discarded the counts on the one call
+    # where a caller most wants them.
     body = _ok_body()
     body["stop_reason"] = "max_tokens"
+    body["usage"] = {
+        "input_tokens": 11,
+        "output_tokens": 2820,
+        "output_tokens_details": {"thinking_tokens": 1240},
+    }
     transport = RecordingTransport(body)
 
-    with pytest.raises(PrismError):
-        Prism.text().using("anthropic", "claude-sonnet-4-5", {"transport": transport}).with_prompt(
-            "Hi"
-        ).as_text()
+    response = (
+        Prism.text()
+        .using("anthropic", "claude-sonnet-4-5", {"transport": transport})
+        .with_prompt("Hi")
+        .as_text()
+    )
+
+    # LENGTH, not STOP: the caller has to be able to tell a truncated answer from
+    # a complete one, which is the whole cost of not raising.
+    assert response.finish_reason is FinishReason.LENGTH
+    assert response.text
+    assert response.usage.thought_tokens == 1240
 
 
 def test_an_unrecognised_stop_reason_is_unknown_not_stop() -> None:
