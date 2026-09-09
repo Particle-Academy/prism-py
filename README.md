@@ -61,8 +61,24 @@ Two things this port has that the reference does not:
 ## Install
 
 ```
-pip install prism-ai
+pip install "git+https://github.com/Particle-Academy/prism-py"
 ```
+
+**Do not `pip install prism-ai`. That name on PyPI is somebody else's package**
+— author `gwhite`, shipping a `prism_ai` module, unrelated to this project. It
+is not a squat to route around later: it publishes **the same version number**
+this port carries, so a pin of `prism-ai==0.1.0` resolves to the stranger's
+distribution with nothing to tell you apart.
+
+It is not inert either. It declares `httpx`, `requests` and `tqdm`, where this
+port declares none, and installing it has been reported ROLLING HTTPX BACK
+(0.28.1 → 0.25.2) and breaking an MCP client sharing the environment. pip prints
+that conflict as a warning *after* the words "Successfully installed", so a CI
+or otherwise non-interactive install reports success and the damage surfaces
+somewhere else entirely.
+
+Pin the git URL, and leave a comment where you pin it — this is the kind of line
+a later tidy-up "corrects" into a version specifier.
 
 Configuration comes from explicit constructor arguments, falling back to
 `OPENAI_API_KEY`, `OPENAI_URL`, `OPENAI_ORGANIZATION` and `OPENAI_PROJECT`. The
