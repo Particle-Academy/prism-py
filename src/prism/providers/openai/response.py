@@ -18,6 +18,7 @@ from prism.text.response import Response
 from prism.text.response_builder import ResponseBuilder
 from prism.text.step import Step
 from prism.value_objects import Meta, ProviderRateLimit, Usage
+from prism.value_objects.generated_image import GeneratedImage
 
 __all__ = ["parse_text_response"]
 
@@ -126,8 +127,74 @@ def _build_additional_content(output: Sequence[Mapping[str, Any]]) -> dict[str, 
             "openPageUrls": _web_search_actions(output, "open_page", "url") or None,
             "findInPagePatterns": _web_search_actions(output, "find_in_page", "pattern") or None,
             "reasoningSummaries": _reasoning_summaries(output),
+            "generatedImages": _generated_images(output) or None,
+            "imageGenerationCalls": _image_generation_calls(output) or None,
         }
     )
+
+
+def _generated_images(output: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """The images a HOSTED image tool generated.
+
+    Every other hosted tool here hands its output back through
+    ``additional_content``, and a turn that generated an image had nowhere to put
+    the bytes but ``raw`` -- the untyped escape hatch, not a surface. So a caller
+    using ``web_search`` was served and a caller using ``image_generation`` was
+    not. That asymmetry was the gap, not the request parameters.
+
+    Built through :class:`~prism.value_objects.generated_image.GeneratedImage`
+    and then serialised, because ``additional_content`` here carries plain data.
+    Going through the value object is what keeps these key names from drifting
+    from the images endpoint's within this port.
+    """
+    images: list[dict[str, Any]] = []
+
+    for item in output:
+        if data_get(item, "type") != "image_generation_call":
+            continue
+
+        result = data_get(item, "result")
+        if not isinstance(result, str) or result == "":
+            continue
+
+        images.append(
+            GeneratedImage(
+                base64=result,
+                revised_prompt=data_get(item, "revised_prompt"),
+            ).to_dict()
+        )
+
+    return images
+
+
+def _image_generation_calls(output: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """What the provider ACTUALLY drew, as opposed to what was asked for.
+
+    Separate from the images because this is the part a caller reconciles against
+    its own request: a provider that silently served a different size or quality
+    is visible only here.
+    """
+    calls: list[dict[str, Any]] = []
+
+    for item in output:
+        if data_get(item, "type") != "image_generation_call":
+            continue
+
+        calls.append(
+            where_not_null(
+                {
+                    "id": data_get(item, "id"),
+                    "status": data_get(item, "status"),
+                    "revised_prompt": data_get(item, "revised_prompt"),
+                    "size": data_get(item, "size"),
+                    "quality": data_get(item, "quality"),
+                    "background": data_get(item, "background"),
+                    "output_format": data_get(item, "output_format"),
+                }
+            )
+        )
+
+    return calls
 
 
 def _web_search_actions(

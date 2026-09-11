@@ -267,6 +267,78 @@ def test_web_search_actions_are_collected_uniquely() -> None:
     assert response.additional_content["searchQueries"] == ["prism"]
 
 
+def _image_generation_body() -> dict[str, object]:
+    return body(
+        output=[
+            {
+                "id": "ig_1",
+                "type": "image_generation_call",
+                "status": "completed",
+                "revised_prompt": "a photorealistic prism",
+                "size": "1024x1024",
+                "quality": "high",
+                "output_format": "png",
+                "result": "aVdBTUEAALGPC",
+            },
+            {
+                "id": "msg_1",
+                "type": "message",
+                "status": "completed",
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": "drawn"}],
+            },
+        ]
+    )
+
+
+def test_a_hosted_image_tool_hands_its_image_back() -> None:
+    """The asymmetry this closes.
+
+    web_search output reached additional_content and image_generation output
+    reached nothing but ``raw``, so one hosted tool was served and the other was
+    not.
+    """
+    response = parse_text_response(request(), _image_generation_body())
+
+    images = response.steps[0].additional_content["generatedImages"]
+
+    assert len(images) == 1
+    assert images[0]["base64"] == "aVdBTUEAALGPC"
+    assert images[0]["revised_prompt"] == "a photorealistic prism"
+
+
+def test_a_hosted_image_call_reports_what_was_actually_drawn() -> None:
+    """Separate from the image, because this is what a caller reconciles.
+
+    A provider that silently served a different size or quality is visible only
+    here.
+    """
+    response = parse_text_response(request(), _image_generation_body())
+
+    call = response.steps[0].additional_content["imageGenerationCalls"][0]
+
+    assert call == {
+        "id": "ig_1",
+        "status": "completed",
+        "revised_prompt": "a photorealistic prism",
+        "size": "1024x1024",
+        "quality": "high",
+        "output_format": "png",
+    }
+
+
+def test_a_turn_without_an_image_gains_no_image_keys() -> None:
+    """The vacuity guard for the two above.
+
+    A parser that always emitted an empty list would pass them both, and every
+    caller would then have to branch on a key that is always present.
+    """
+    response = parse_text_response(request(), body())
+
+    assert "generatedImages" not in response.steps[0].additional_content
+    assert "imageGenerationCalls" not in response.steps[0].additional_content
+
+
 def test_the_serialised_shape_keeps_the_reference_key_order() -> None:
     result = parse_text_response(request(), body()).to_dict()
 
