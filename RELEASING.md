@@ -1,6 +1,6 @@
 # Releasing
 
-This repository publishes **`prism-ai`** to PyPI. The repository name and the
+This repository publishes **`prism-ai-core`** to PyPI. The repository name and the
 package name are not the same, and PyPI cares about the package name.
 
 A release is a tag push. `.github/workflows/release.yml` does the rest.

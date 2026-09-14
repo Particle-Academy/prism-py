@@ -1,4 +1,4 @@
-# AGENTS.md — prism-ai (Python)
+# AGENTS.md — prism-ai-core (Python)
 
 The Python port of Prism's text capability.
 

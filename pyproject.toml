@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "prism-ai"
+name = "prism-ai-core"
 version = "0.1.0"
 description = "A unified API layer over LLM providers — Python port of the Prism text capability."
 readme = "README.md"
@@ -29,6 +29,12 @@ dev = ["pytest>=8.0", "mypy>=1.11", "ruff>=0.6"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/prism"]
+
+# The source archive carries the package and its licence, and nothing else: not the Lab's
+# loopback agent, CI workflows or contributor notes. Anchored with a leading slash, since an
+# unanchored README.md also matches agent/README.md.
+[tool.hatch.build.targets.sdist]
+include = ["/src/prism", "/README.md", "/LICENSE", "/pyproject.toml"]
 
 [tool.ruff]
 line-length = 100

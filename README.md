@@ -1,4 +1,4 @@
-# prism-ai
+# prism-ai-core
 
 A unified API layer over LLM providers — the Python port of
 [Prism](https://github.com/Particle-Academy/prism)'s text capability.
@@ -59,6 +59,13 @@ Two things this port has that the reference does not:
   with it.
 
 ## Install
+
+```
+pip install prism-ai-core
+```
+
+The distribution is `prism-ai-core`; the package it installs is imported as
+`prism`. To track `main` instead:
 
 ```
 pip install "git+https://github.com/Particle-Academy/prism-py"
