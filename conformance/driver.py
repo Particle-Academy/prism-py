@@ -33,6 +33,7 @@ from prism.value_objects import (
     Usage,
     UserMessage,
 )
+from prism.value_objects.media_file import Audio, Document, Image, Video
 
 __all__ = ["Attempt", "DriverError", "build_pending", "hydrate", "run_case"]
 
@@ -102,12 +103,69 @@ def hydrate(value: Any) -> Any:
     if tag == "Tool":
         return _tool(value)
 
+    if tag in _MEDIA:
+        return _media(value)
+
     factory = _CONSTRUCTS.get(str(tag))
 
     if factory is None:
         raise DriverError(f"Unknown construct {tag!r}.")
 
     return factory(**{_snake(key): hydrate(item) for key, item in value.items() if key != "$"})
+
+
+_MEDIA: dict[str, type[Any]] = {
+    "Image": Image,
+    "Audio": Audio,
+    "Video": Video,
+    "Document": Document,
+}
+
+
+def _media(spec: Mapping[str, Any]) -> Any:
+    """Build media the way a caller would, dispatching on the case's ``from``.
+
+    Never from a local path: a golden generated that way would record bytes
+    read off the machine that generated it. Raw content arrives as a UTF-8
+    string and is encoded here, because the port takes bytes.
+
+    A document's title is set with ``titled()``. The reference passes it as
+    the factory's second argument, where this port's factories keep their base
+    meaning (the mime type) -- a deliberate divergence recorded in Document
+    itself. The corpus names the VALUE, so both routes meet at the same stored
+    form.
+    """
+    cls = _MEDIA[str(spec["$"])]
+    is_document = cls is Document
+    mime_type = spec.get("mimeType")
+    title = spec.get("title")
+
+    if not is_document and title is not None:
+        raise DriverError("Only a Document has a title.")
+
+    source = spec["from"]
+    media: Any
+    if source == "url":
+        media = cls.from_url(spec["url"], mime_type)
+    elif source == "base64":
+        media = cls.from_base64(spec["base64"], mime_type)
+    elif source == "rawContent":
+        media = cls.from_raw_content(str(spec["rawContent"]).encode("utf-8"), mime_type)
+    elif source == "fileId":
+        media = cls.from_file_id(spec["fileId"])
+    elif source == "text" and is_document:
+        media = Document.from_text(spec["text"])
+    elif source == "chunks" and is_document:
+        media = Document.from_chunks(spec["chunks"])
+    else:
+        raise DriverError(f"Cannot build {spec['$']} from {source!r}.")
+
+    if title is not None:
+        media.titled(title)
+    if spec.get("filename") is not None:
+        media.as_(spec["filename"])
+
+    return media
 
 
 def _tool(spec: Mapping[str, Any]) -> Tool:
