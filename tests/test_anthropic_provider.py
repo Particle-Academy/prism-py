@@ -430,3 +430,23 @@ def test_sends_no_thinking_block_without_a_signature() -> None:
     ).as_text()
 
     assert _sent_body(transport)["messages"][1]["content"] == [{"type": "text", "text": "Hello."}]
+
+
+@pytest.mark.parametrize(
+    ("thinking", "expected"),
+    [
+        ({"type": "enabled", "budget_tokens": 2048}, {"type": "enabled", "budget_tokens": 2048}),
+        (
+            {"type": "adaptive", "display": "summarized"},
+            {"type": "adaptive", "display": "summarized"},
+        ),
+        ({"type": "disabled"}, {"type": "disabled"}),
+        ({"enabled": False}, None),
+        ({}, None),
+    ],
+)
+def test_sends_a_thinking_shape_prism_does_not_spell_as_given(
+    thinking: dict[str, Any], expected: dict[str, Any] | None
+) -> None:
+    # The same rules as the reference, value for value.
+    assert _body_for({"thinking": thinking}).get("thinking") == expected

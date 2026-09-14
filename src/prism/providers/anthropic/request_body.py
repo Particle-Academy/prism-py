@@ -85,20 +85,26 @@ def _thinking(request: Request) -> Any:
     is not an integer falls back to 1024, Anthropic's minimum, as in the
     reference.
 
-    Every other shape, ``{"type": "adaptive"}`` included, is sent as given. The
-    reference keeps only ``{"type": "adaptive"}`` and drops the rest; which way
-    both should go is open in G-57.
+    A map with ``enabled`` and no ``type`` that is not ``True`` asks for no
+    thinking, and so does an empty map. Every other shape,
+    ``{"type": "adaptive"}`` included, is sent as given, as the reference sends
+    it.
     """
     if request.reasoning_enabled is False:
         return None
 
     thinking = request.provider_option("thinking")
 
-    if (
-        isinstance(thinking, Mapping)
-        and thinking.get("type") != "adaptive"
-        and thinking.get("enabled") is True
-    ):
+    if not isinstance(thinking, Mapping):
+        return thinking
+
+    if not thinking:
+        return None
+
+    if thinking.get("type") == "adaptive":
+        return thinking
+
+    if thinking.get("enabled") is True:
         budget = thinking.get("budgetTokens")
 
         return {
@@ -108,5 +114,8 @@ def _thinking(request: Request) -> Any:
             if isinstance(budget, int) and not isinstance(budget, bool)
             else DEFAULT_THINKING_BUDGET,
         }
+
+    if "enabled" in thinking and "type" not in thinking:
+        return None
 
     return thinking
