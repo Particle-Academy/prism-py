@@ -7,7 +7,18 @@ from typing import Any
 
 import pytest
 
-from prism import HttpRequest, HttpResponse, Prism, PrismError, canonical
+from prism import (
+    AssistantMessage,
+    HttpRequest,
+    HttpResponse,
+    Prism,
+    PrismError,
+    ToolCall,
+    ToolResult,
+    ToolResultMessage,
+    UserMessage,
+    canonical,
+)
 from prism.enums import FinishReason
 from prism.providers.anthropic.provider import Anthropic
 
@@ -273,3 +284,149 @@ def test_the_provider_is_registered_under_its_key() -> None:
     from prism.registry import resolve_provider
 
     assert isinstance(resolve_provider("anthropic"), Anthropic)
+
+
+# --- thinking options (G-57) ------------------------------------------------
+
+
+def _body_for(
+    options: dict[str, Any] | None = None, *, reasoning: bool | None = None
+) -> dict[str, Any]:
+    transport = RecordingTransport()
+    pending = (
+        Prism.text()
+        .using("anthropic", "claude-sonnet-4-6", {"transport": transport})
+        .with_prompt("Hi")
+    )
+
+    if options is not None:
+        pending = pending.with_provider_options(options)
+
+    if reasoning is not None:
+        pending = pending.with_reasoning(reasoning)
+
+    pending.as_text()
+
+    return _sent_body(transport)
+
+
+def test_spells_prisms_enabled_thinking_the_way_anthropic_takes_it() -> None:
+    # Sent as given this was a 400, so a mode that worked in PHP failed here.
+    body = _body_for({"thinking": {"enabled": True, "budgetTokens": 2048}})
+
+    assert body["thinking"] == {"type": "enabled", "budget_tokens": 2048}
+
+
+@pytest.mark.parametrize("budget", [None, "4000", 1.5, True])
+def test_falls_back_to_the_minimum_budget_when_none_is_an_integer(budget: Any) -> None:
+    thinking: dict[str, Any] = {"enabled": True}
+
+    if budget is not None:
+        thinking["budgetTokens"] = budget
+
+    assert _body_for({"thinking": thinking})["thinking"] == {
+        "type": "enabled",
+        "budget_tokens": 1024,
+    }
+
+
+def test_sends_adaptive_thinking_and_effort_as_output_config() -> None:
+    body = _body_for({"thinking": {"type": "adaptive"}, "effort": "medium"})
+
+    assert body["thinking"] == {"type": "adaptive"}
+    assert body["output_config"] == {"effort": "medium"}
+    assert "effort" not in body
+
+
+def test_sends_neither_thinking_nor_output_config_unasked() -> None:
+    body = _body_for()
+
+    assert "thinking" not in body
+    assert "output_config" not in body
+
+
+def test_with_reasoning_false_wins_over_a_thinking_option_as_in_the_reference() -> None:
+    assert "thinking" not in _body_for({"thinking": {"type": "adaptive"}}, reasoning=False)
+
+
+def test_keeps_the_thinking_signature_and_sends_the_block_back_first() -> None:
+    # Anthropic requires the thinking block, with its signature, on a tool-use
+    # turn with thinking on. The text kept is the FIRST block's, because the
+    # signature covers exactly that block.
+    body = _ok_body()
+    body["content"] = [
+        {"type": "thinking", "thinking": "first", "signature": "sig-1"},
+        {"type": "text", "text": "Checking."},
+        {"type": "thinking", "thinking": "second", "signature": "sig-2"},
+    ]
+    transport = RecordingTransport(body)
+
+    def pending() -> Any:
+        return (
+            Prism.text()
+            .using("anthropic", "claude-sonnet-4-6", {"transport": transport})
+            .with_provider_options({"thinking": {"type": "adaptive"}})
+        )
+
+    first = pending().with_prompt("Weather?").as_text()
+
+    assert first.additional_content["thinking"] == "first"
+    assert first.additional_content["thinking_signature"] == "sig-1"
+
+    pending().with_messages(
+        [
+            UserMessage("Weather?"),
+            AssistantMessage(
+                "Checking.",
+                [ToolCall("toolu_1", "weather", {"city": "Detroit"})],
+                first.additional_content,
+            ),
+            ToolResultMessage([ToolResult("toolu_1", "weather", {"city": "Detroit"}, "Sunny")]),
+        ]
+    ).as_text()
+
+    assistant = next(m for m in _sent_body(transport)["messages"] if m["role"] == "assistant")
+
+    assert assistant["content"][0] == {
+        "type": "thinking",
+        "thinking": "first",
+        "signature": "sig-1",
+    }
+    assert [block["type"] for block in assistant["content"]] == ["thinking", "text", "tool_use"]
+
+
+def test_sends_back_a_thinking_block_whose_text_was_omitted() -> None:
+    # Its signature is still required, so an empty text is not "no thinking".
+    transport = RecordingTransport()
+
+    Prism.text().using("anthropic", "claude-sonnet-4-6", {"transport": transport}).with_messages(
+        [
+            UserMessage("Weather?"),
+            AssistantMessage(
+                "",
+                [ToolCall("toolu_1", "weather", {})],
+                {"thinking": "", "thinking_signature": "sig-1"},
+            ),
+            ToolResultMessage([ToolResult("toolu_1", "weather", {}, "Sunny")]),
+        ]
+    ).as_text()
+
+    assert _sent_body(transport)["messages"][1]["content"][0] == {
+        "type": "thinking",
+        "thinking": "",
+        "signature": "sig-1",
+    }
+
+
+def test_sends_no_thinking_block_without_a_signature() -> None:
+    transport = RecordingTransport()
+
+    Prism.text().using("anthropic", "claude-sonnet-4-6", {"transport": transport}).with_messages(
+        [
+            UserMessage("Hi"),
+            AssistantMessage("Hello.", [], {"thinking": "hmm"}),
+            UserMessage("Again"),
+        ]
+    ).as_text()
+
+    assert _sent_body(transport)["messages"][1]["content"] == [{"type": "text", "text": "Hello."}]

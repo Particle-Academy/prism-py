@@ -110,7 +110,7 @@ def _build_step(
         system_prompts=list(request.system_prompts),
         additional_content=where_not_null(
             {
-                "thinking": _thinking(content),
+                **_thinking(content),
                 "stopSequence": data_get(data, "stop_sequence"),
             }
         ),
@@ -130,16 +130,23 @@ def _output_text(content: Sequence[Mapping[str, Any]]) -> str:
     )
 
 
-def _thinking(content: Sequence[Mapping[str, Any]]) -> str | None:
-    """Extended-thinking blocks joined, or ``None`` when the model did not think."""
-    parts = [
-        data_get(block, "thinking", "")
-        for block in content
-        if data_get(block, "type") == "thinking"
-    ]
-    joined = "".join(part for part in parts if part)
+def _thinking(content: Sequence[Mapping[str, Any]]) -> dict[str, str | None]:
+    """The first thinking block's text and signature, as the reference keeps them.
 
-    return joined or None
+    The signature is what lets the block be sent back on a later tool-use turn
+    (G-57). It covers one block's text exactly, so the text kept beside it is
+    that block's, not every block joined: joined text under one signature is a
+    block Anthropic would refuse. A response with more than one thinking block
+    keeps only the first, in all three languages.
+    """
+    block = next((block for block in content if data_get(block, "type") == "thinking"), None)
+    text = data_get(block, "thinking") if block is not None else None
+    signature = data_get(block, "signature") if block is not None else None
+
+    return {
+        "thinking": text if isinstance(text, str) else None,
+        "thinking_signature": signature if isinstance(signature, str) else None,
+    }
 
 
 def _build_usage(data: Mapping[str, Any]) -> Usage:

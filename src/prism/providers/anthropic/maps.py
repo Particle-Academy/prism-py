@@ -115,8 +115,16 @@ def map_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
 
 def _append_assistant(message: AssistantMessage, items: list[dict[str, Any]]) -> None:
     content: list[dict[str, Any]] = []
+    thinking = message.additional_content.get("thinking")
+    signature = message.additional_content.get("thinking_signature")
 
-    # Text first. Anthropic reads blocks in order, and a tool_use ahead of the
+    # The thinking block goes back FIRST, with its signature. Anthropic requires
+    # it on a tool-use turn with thinking on, and refuses a thinking block that
+    # has no signature, so without both it is left out (G-57).
+    if isinstance(thinking, str) and isinstance(signature, str):
+        content.append({"type": "thinking", "thinking": thinking, "signature": signature})
+
+    # Text next. Anthropic reads blocks in order, and a tool_use ahead of the
     # reasoning that led to it reads as a model that decided first and explained
     # afterwards.
     if message.content:
