@@ -1,6 +1,6 @@
 # AGENTS.md — prism-ai-core (Python)
 
-The Python port of Prism's text capability.
+The Python port of Prism.
 
 > **Read [the shared guide](https://github.com/Particle-Academy/prism-parity/blob/main/docs/AGENTS.md)
 > first** — the boundary, the gates, the binding decisions, the review skills.

@@ -1,7 +1,6 @@
 """prism — a unified API layer over LLM providers.
 
-This is the Python port of the Prism text capability against OpenAI's Responses
-API:
+This is the Python port of Prism:
 
 >>> from prism import Prism
 >>> response = (                             # doctest: +SKIP

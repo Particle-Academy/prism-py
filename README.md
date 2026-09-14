@@ -1,7 +1,7 @@
 # prism-ai-core
 
 A unified API layer over LLM providers — the Python port of
-[Prism](https://github.com/Particle-Academy/prism)'s text capability.
+[Prism](https://github.com/Particle-Academy/prism).
 
 Zero runtime dependencies. Python 3.10+.
 
