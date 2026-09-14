@@ -157,6 +157,27 @@ def _omit_nulls(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: _without_nulls(item) for key, item in payload.items() if item is not None}
 
 
+def _without_key(value: Any, dropped: str) -> Any:
+    if isinstance(value, dict):
+        return {key: _without_key(item, dropped) for key, item in value.items() if key != dropped}
+
+    if isinstance(value, list):
+        return [_without_key(item, dropped) for item in value]
+
+    return value
+
+
+def _drop_thinking_signature(payload: dict[str, Any]) -> dict[str, Any]:
+    """What both ports did until G-57: keep a thinking block's text, lose its signature.
+
+    Without the signature nothing can send the block back on a tool-use turn.
+    The raw payload's own ``signature`` key is left alone; only the parsed
+    result loses it.
+    """
+    result: dict[str, Any] = _without_key(payload, "thinking_signature")
+    return result
+
+
 def _falsy_filter(values: dict[str, Any]) -> dict[str, Any]:
     """The optional-key filter, on falsiness instead of nullity."""
     return {key: value for key, value in values.items() if value}
@@ -318,6 +339,9 @@ _MUTATIONS: dict[str, Mutation] = {
     ),
     "omit-null-on-serialize": Mutation(id="omit-null-on-serialize", serialize=_omit_nulls),
     "omit-null-on-parse": Mutation(id="omit-null-on-parse", parsed=_omit_nulls),
+    "drop-thinking-signature": Mutation(
+        id="drop-thinking-signature", parsed=_drop_thinking_signature
+    ),
     "rehydrate-reappends-text": Mutation(
         id="rehydrate-reappends-text", rehydrate=_rehydrate_reappends_text
     ),
