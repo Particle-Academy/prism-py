@@ -443,10 +443,11 @@ def test_sends_no_thinking_block_without_a_signature() -> None:
         ({"type": "disabled"}, {"type": "disabled"}),
         ({"enabled": False}, None),
         ({}, None),
+        (False, None),
     ],
 )
 def test_sends_a_thinking_shape_prism_does_not_spell_as_given(
-    thinking: dict[str, Any], expected: dict[str, Any] | None
+    thinking: dict[str, Any] | bool, expected: dict[str, Any] | None
 ) -> None:
     # The same rules as the reference, value for value.
     assert _body_for({"thinking": thinking}).get("thinking") == expected

@@ -95,6 +95,10 @@ def _thinking(request: Request) -> Any:
 
     thinking = request.provider_option("thinking")
 
+    # ``False`` asks for no thinking, as in the reference. Sent, it is a 400.
+    if thinking is False:
+        return None
+
     if not isinstance(thinking, Mapping):
         return thinking
 
