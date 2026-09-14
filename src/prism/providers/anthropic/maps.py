@@ -322,7 +322,10 @@ def _document_source(document: Document) -> dict[str, Any]:
                 f"valid UTF-8, or a mime type that is not text/* -- {error}",
             ) from error
 
-        return {"type": "text", "media_type": mime_type, "data": decoded}
+        # text/plain whatever the document declared. Anthropic's text source
+        # takes nothing else, so text/markdown, text/csv or a charset parameter
+        # failed the whole request (prism#49). The content is sent as given.
+        return {"type": "text", "media_type": "text/plain", "data": decoded}
 
     encoded = document.base64()
 

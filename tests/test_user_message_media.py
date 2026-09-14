@@ -328,6 +328,22 @@ def test_anthropic_sends_a_text_document_as_text() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    "mime_type", ["text/markdown", "text/csv", "text/html", "text/plain; charset=utf-8"]
+)
+def test_anthropic_sends_every_text_document_as_text_plain(mime_type: str) -> None:
+    # prism#49: a declared text/markdown or text/csv made Anthropic refuse the
+    # whole request, because its text source accepts text/plain only.
+    document: Document = Document.from_raw_content(b"# Brief", mime_type)
+    mapped = map_anthropic([UserMessage("read this", [document])])
+
+    assert _content(mapped)[1]["source"] == {
+        "type": "text",
+        "media_type": "text/plain",
+        "data": "# Brief",
+    }
+
+
 def test_anthropic_refuses_a_text_document_that_is_not_valid_utf8_by_name() -> None:
     # Left alone this raised UnicodeDecodeError out of a mapper -- uncoded, and
     # saying only that something failed deep inside. `prism-ts` did the opposite
