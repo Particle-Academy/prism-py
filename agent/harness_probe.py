@@ -139,9 +139,12 @@ def probe_harness() -> dict[str, Any]:
             "session:23bd5c8949f6:7:probe",
         )
 
+        # The model asks for the call ONCE. On resume the harness runs the
+        # approved call where it stopped rather than asking again, as a real
+        # provider would issue a repeated call under a new id.
         def client(_request: Any) -> Any:
             runs["turn"] += 1
-            if runs["turn"] <= 2:
+            if runs["turn"] == 1:
                 return LlmResponse(
                     text="",
                     finish_reason="tool_calls",
@@ -167,7 +170,7 @@ def probe_harness() -> dict[str, Any]:
 
         # The decision is durable: written to the thread, which lives in the
         # file store, so a different process would read the same answer.
-        record_approval(session, "call-1", True)
+        record_approval(session, first.pending_approvals[0].id, True)
 
         resumed = runtime.send(session, "")
 
