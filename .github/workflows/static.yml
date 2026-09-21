@@ -14,9 +14,39 @@ permissions:
   contents: read
 
 jobs:
+  # EVERY job below installs dependencies, and an install executes code:
+  # `npm ci` runs lifecycle scripts, pip runs a build backend. So this gate is a
+  # dependency of each of them rather than a job running alongside — a check
+  # that finishes after the install has already run is a report, not a gate.
+  #
+  # The list is fetched, never vendored, so there is no copy here to drift.
+  third-party:
+    name: Third-party dependency allowlist
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # This job only reads files, so it keeps no token in .git/config for the
+      # fetched checker to find.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Fetch the third-party allowlist
+        uses: actions/checkout@v4
+        with:
+          repository: Particle-Academy/.github
+          path: .third-party-allowlist
+          persist-credentials: false
+
+      - name: Third-party dependency allowlist
+        run: |
+          node .third-party-allowlist/third-party/check.mjs --repo .
+          node -e "require('node:fs').rmSync('.third-party-allowlist',{recursive:true,force:true})"
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    needs: third-party
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +60,7 @@ jobs:
   types:
     name: Types
     runs-on: ubuntu-latest
+    needs: third-party
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +87,7 @@ jobs:
   package:
     name: Package contents
     runs-on: ubuntu-latest
+    needs: third-party
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4

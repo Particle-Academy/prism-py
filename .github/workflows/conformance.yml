@@ -40,6 +40,24 @@ jobs:
         with:
           python-version: "3.12"
 
+      # BEFORE the install, and in this file rather than only in tests.yml. pip
+      # runs a package's build backend to install it, so an unapproved or
+      # unmaintained dependency executes code on this runner the moment it is
+      # fetched — a check that runs alongside the install reports on something
+      # that has already happened. The list is fetched, never vendored, so there
+      # is no copy here to drift.
+      - name: Fetch the third-party allowlist
+        uses: actions/checkout@v4
+        with:
+          repository: Particle-Academy/.github
+          path: .third-party-allowlist
+          persist-credentials: false
+
+      - name: Third-party dependency allowlist
+        run: |
+          node .third-party-allowlist/third-party/check.mjs --repo .
+          node -e "require('node:fs').rmSync('.third-party-allowlist',{recursive:true,force:true})"
+
       - name: Install
         run: python -m pip install --quiet -e ".[dev]"
 
