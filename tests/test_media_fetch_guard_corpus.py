@@ -28,13 +28,19 @@ REFUSALS = {
 
 
 def test_inventory_and_explicit_legacy_path_skip() -> None:
-    assert [row["id"] for row in ROWS] == [f"url-{i:04}" for i in range(1, 12)]
+    assert [row["id"] for row in ROWS] == [f"url-{i:04}" for i in range(1, 13)]
     assert SUITE.skipped_ids("py") == ["url-0009"]
     assert SUITE.skipped_ids("php") == []
     assert SUITE.skipped_ids("ts") == []
     skipped = next(row for row in ROWS if row["id"] == "url-0009")
     assert "no unguarded fetch" in skipped["skip_reason"]
     assert not hasattr(Image, "fetch")
+    for row in ROWS:
+        if "redirects_always" in row:
+            assert isinstance(row["redirects_always"], bool)
+        if row.get("redirects_always") is True:
+            assert isinstance(row.get("redirects_to"), str) and row["redirects_to"]
+            assert row.get("guarded", True) is True
 
 
 @pytest.mark.parametrize("row", ROWS, ids=lambda row: row["id"])
@@ -55,7 +61,9 @@ def test_recorded_refusal_and_requests(row: dict[str, Any]) -> None:
             # Fresh fake per row: a previous control cannot swallow a redirect.
             sent.append(request)
             assert request.follow_redirects is False
-            if row.get("redirects_to") and request.url != row["redirects_to"]:
+            if row.get("redirects_to") and (
+                row.get("redirects_always") is True or request.url != row["redirects_to"]
+            ):
                 return HttpResponse(302, b"", {"location": row["redirects_to"]})
             return HttpResponse(200, CONTENT, {"content-type": "image/png"})
 
@@ -75,6 +83,10 @@ def test_recorded_refusal_and_requests(row: dict[str, Any]) -> None:
         assert [request.url for request in sent] == [row["url"]]
         assert image.raw_content() == CONTENT
         assert image.mime_type() == "image/png"
+    elif row.get("redirects_always") is True:
+        # Six public requests pin the default allowance to five redirect hops.
+        assert [request.url for request in sent] == [row["url"]] * 6
+        assert not image.has_raw_content()
     elif row.get("redirects_to"):
         assert [request.url for request in sent] == [row["url"]]
         assert row["redirects_to"] not in [request.url for request in sent]
