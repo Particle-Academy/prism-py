@@ -66,6 +66,7 @@ from prism.prism import Prism
 from prism.providers.base import Provider
 from prism.providers.mistral import Mistral, MistralStreamMapper
 from prism.providers.openai import OpenAI, build_request_body, build_tools, parse_text_response
+from prism.public_url import DnsHostResolver, HostResolver
 from prism.registry import register_provider, resolve_provider
 from prism.schema import BooleanSchema, NumberSchema, Schema, StringSchema
 from prism.text import PendingRequest, Request, Response, ResponseBuilder, Step
@@ -111,6 +112,7 @@ __all__ = [
     "CancelBatchRequest",
     "DeleteFileRequest",
     "DeleteFileResult",
+    "DnsHostResolver",
     "Document",
     "DownloadFileRequest",
     "ErrorCode",
@@ -124,6 +126,7 @@ __all__ = [
     "GeneratedAudio",
     "GetBatchResultsRequest",
     "GetFileMetadataRequest",
+    "HostResolver",
     "HttpRequest",
     "HttpResponse",
     "Image",

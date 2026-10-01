@@ -65,6 +65,9 @@ class HttpRequest:
     headers: dict[str, str] = field(default_factory=dict)
     body: bytes | None = None
     timeout: float = DEFAULT_TIMEOUT
+    # Guarded media requests inspect each redirect before sending the next hop.
+    # A Transport implementation must honor this flag when it is false.
+    follow_redirects: bool = True
 
 
 @dataclass(frozen=True)
@@ -80,9 +83,20 @@ class HttpResponse:
 
 
 class Transport(Protocol):
-    """Anything that can carry an :class:`HttpRequest` and bring back a response."""
+    """Carry a request and return its response, honoring ``follow_redirects``.
+
+    When false, return the redirect itself without requesting its destination.
+    Guarded media relies on this contract to check each hop before dispatch.
+    """
 
     def send(self, request: HttpRequest) -> HttpResponse: ...
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(
+        self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str
+    ) -> None:
+        return None
 
 
 class UrllibTransport:
@@ -101,7 +115,12 @@ class UrllibTransport:
         )
 
         try:
-            with urllib.request.urlopen(raw, timeout=request.timeout) as response:
+            open_request = (
+                urllib.request.urlopen
+                if request.follow_redirects
+                else urllib.request.build_opener(_NoRedirect()).open
+            )
+            with open_request(raw, timeout=request.timeout) as response:
                 return HttpResponse(
                     status=response.status,
                     body=response.read(),
@@ -110,11 +129,12 @@ class UrllibTransport:
                     },
                 )
         except urllib.error.HTTPError as error:
-            return HttpResponse(
-                status=error.code,
-                body=error.read(),
-                headers={fold_header_name(key): value for key, value in error.headers.items()},
-            )
+            with error:
+                return HttpResponse(
+                    status=error.code,
+                    body=error.read(),
+                    headers={fold_header_name(key): value for key, value in error.headers.items()},
+                )
 
 
 @dataclass

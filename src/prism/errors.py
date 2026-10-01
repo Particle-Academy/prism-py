@@ -1,10 +1,9 @@
 """Failures, identified by a stable code.
 
-The PHP reference identifies every failure by an English sentence and nothing
-else, so any consumer that needs to branch on a failure ends up matching on
-prose and every wording improvement becomes a silent breaking change. This port
-carries a code on every error instead. The CODE is the contract; the prose is
-not, and is free to change.
+A consumer branches on the code while messages can improve independently.
+This port carries a code on every error, including the five guarded-fetch
+refusals shared with the reference. The code is stable; the prose is free to
+change.
 """
 
 from __future__ import annotations
@@ -35,6 +34,12 @@ class ErrorCode(str, Enum):
     UNSUPPORTED_MEDIA = "unsupported_media"
     WRONG_AUDIO_INPUT = "wrong_audio_input"
     NO_AUDIO_CONTENT = "no_audio_content"
+    SCHEME_NOT_ALLOWED = "scheme_not_allowed"
+    PRIVATE_ADDRESS_REFUSED = "private_address_refused"
+    HOST_DID_NOT_RESOLVE = "host_did_not_resolve"
+    REDIRECT_REFUSED = "redirect_refused"
+    TOO_MANY_REDIRECTS = "too_many_redirects"
+    UNFETCHABLE_MEDIA = "unfetchable_media"
 
 
 class PrismError(Exception):

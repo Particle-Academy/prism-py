@@ -7,8 +7,11 @@ import mimetypes
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, ClassVar, cast
+from urllib.parse import urljoin, urlsplit
 
 from prism.errors import ErrorCode, PrismError
+from prism.http import HttpRequest, Transport, UrllibTransport, fold_header_name
+from prism.public_url import DnsHostResolver, HostResolver, assert_public_url
 
 __all__ = ["Audio", "Document", "Image", "Media", "Video", "guess_mime_type"]
 
@@ -36,6 +39,9 @@ class Media:
       that reaches the network when you read it turns a stored locator into a
       request at replay time, which is the hazard prism-harness documents about
       replaying threads.
+
+    ``fetch_public()`` is the explicit guarded path. No unguarded media-fetch
+    method is provided.
     """
 
     #: The discriminator in the serialised form, under the key ``kind``.
@@ -183,6 +189,74 @@ class Media:
 
         self._base64 = _base64.b64encode(self._raw_content).decode("ascii")
         return self._base64
+
+    def fetch_public(
+        self,
+        *,
+        transport: Transport | None = None,
+        resolver: HostResolver | None = None,
+        max_redirects: int = 5,
+    ) -> Media:
+        """Explicit guarded fetch, checking every destination before HTTP.
+
+        The transport must honor HttpRequest.follow_redirects=False. The default
+        urllib transport does so; each hop is validated here. DNS answers are
+        not pinned to the connection, so DNS rebinding remains possible.
+        """
+        if self.url is None:
+            raise PrismError(ErrorCode.UNFETCHABLE_MEDIA, "This payload has no url.")
+        if (
+            isinstance(max_redirects, bool)
+            or not isinstance(max_redirects, int)
+            or max_redirects < 0
+        ):
+            raise ValueError("max_redirects must be a nonnegative integer.")
+        client = transport if transport is not None else UrllibTransport()
+        dns = resolver if resolver is not None else DnsHostResolver()
+        url = self.url
+        for hop in range(max_redirects + 1):
+            try:
+                assert_public_url(url, dns)
+            except PrismError as error:
+                if hop and error.code in {
+                    ErrorCode.SCHEME_NOT_ALLOWED,
+                    ErrorCode.PRIVATE_ADDRESS_REFUSED,
+                    ErrorCode.HOST_DID_NOT_RESOLVE,
+                }:
+                    raise PrismError(
+                        ErrorCode.REDIRECT_REFUSED,
+                        f"{_safe_url(self.url)} redirected to a refused destination.",
+                    ) from None
+                raise
+            response = client.send(HttpRequest("GET", url, follow_redirects=False))
+            headers = {fold_header_name(key): value for key, value in response.headers.items()}
+            location = headers.get("location")
+            if 300 <= response.status < 400 and location:
+                if hop == max_redirects:
+                    raise PrismError(
+                        ErrorCode.TOO_MANY_REDIRECTS,
+                        f"{_safe_url(self.url)} redirected more than {max_redirects} times.",
+                    )
+                try:
+                    url = urljoin(url, location)
+                except ValueError:
+                    raise PrismError(
+                        ErrorCode.REDIRECT_REFUSED,
+                        f"{_safe_url(self.url)} redirected to an invalid URL.",
+                    ) from None
+                continue
+            if not 200 <= response.status < 300:
+                raise PrismError(
+                    ErrorCode.UNFETCHABLE_MEDIA,
+                    f"{_safe_url(url)} responded {response.status}.",
+                    status=response.status,
+                )
+            self._raw_content = response.body
+            self._base64 = None
+            if self._mime_type is None:
+                self._mime_type = headers.get("content-type")
+            return self
+        raise AssertionError("The redirect bound must throw before the loop exits.")
 
     def to_dict(self) -> dict[str, Any]:
         """The serialised form.
@@ -361,3 +435,15 @@ def guess_mime_type(path: str) -> str | None:
     """
     guessed, _ = mimetypes.guess_type(path)
     return guessed
+
+
+def _safe_url(url: str) -> str:
+    """Remove userinfo, query contents and fragment from generated errors."""
+    try:
+        parsed = urlsplit(url)
+        authority = parsed.netloc.rsplit("@", 1)[-1]
+        return f"{parsed.scheme}://{authority}{parsed.path}" + (
+            "?[redacted]" if parsed.query else ""
+        )
+    except ValueError:
+        return "[unreadable url]"
