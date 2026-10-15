@@ -77,6 +77,66 @@ def test_a_model_without_schema_support_falls_back_to_json_mode() -> None:
     assert _sent_body(transport)["text"]["format"] == {"type": "json_object"}
 
 
+# prism#83 / prism-py#8. The prefix list stopped at gpt-5 and o3-mini, so OpenAI's
+# current flagships silently got json_object, where the schema is not enforced.
+@pytest.mark.parametrize(
+    "model",
+    [
+        "gpt-6-sol",
+        "gpt-6-luna",
+        "gpt-6-astra",
+        "gpt-6.1-sol",
+        "gpt-7",
+        "gpt-10-mini",
+        "o1",
+        "o1-pro",
+        "o3",
+        "o3-pro",
+        "o4-mini",
+        "o5",
+        "ft:gpt-6-sol:my-org:custom-name:abc123",
+    ],
+)
+def test_current_and_future_openai_families_get_the_strict_schema(model: str) -> None:
+    transport = RecordingTransport('{"name":"Ada"}')
+
+    (
+        Prism.structured()
+        .using("openai", model, {"api_key": "sk-test", "transport": transport})
+        .with_schema(SCHEMA)
+        .with_prompt("Who?")
+        .as_structured()
+    )
+
+    assert _sent_body(transport)["text"]["format"]["type"] == "json_schema"
+
+
+# A family pattern must not swallow names that only look like one.
+@pytest.mark.parametrize(
+    "model",
+    [
+        "gpt-image-1",
+        "gpt-realtime-2.1",
+        "gpt-4",
+        "gpt-3.5-turbo-0125",
+        "omni-moderation-latest",
+        "ollama-llama3",
+    ],
+)
+def test_names_outside_the_chat_families_keep_json_mode(model: str) -> None:
+    transport = RecordingTransport('{"name":"Ada"}')
+
+    (
+        Prism.structured()
+        .using("openai", model, {"api_key": "sk-test", "transport": transport})
+        .with_schema(SCHEMA)
+        .with_prompt("Who?")
+        .as_structured()
+    )
+
+    assert _sent_body(transport)["text"]["format"] == {"type": "json_object"}
+
+
 def test_a_model_that_cannot_do_structured_output_is_refused() -> None:
     with pytest.raises(PrismError, match="not supported for o1-mini"):
         (
