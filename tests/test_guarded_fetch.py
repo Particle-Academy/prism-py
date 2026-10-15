@@ -311,3 +311,63 @@ def test_existing_transport_default_still_follows_redirects(
     response = UrllibTransport().send(HttpRequest("GET", url + "/redirect"))
     assert response.status == 200
     assert requests == ["/redirect", "/target"]
+
+
+# G-89. Every spelling below was ADMITTED by all three languages, so no
+# cross-language comparison could see it. CGNAT holds Alibaba Cloud's metadata
+# endpoint, and NAT64/6to4 addresses are 169.254.169.254 written in IPv6.
+NON_PUBLIC = [
+    "100.100.100.200",
+    "100.64.0.1",
+    "192.0.0.170",
+    "192.0.2.1",
+    "198.18.0.1",
+    "198.51.100.1",
+    "203.0.113.1",
+    "224.0.0.1",
+    "64:ff9b::a9fe:a9fe",
+    "64:ff9b::7f00:1",
+    "64:ff9b:1::a9fe:a9fe",
+    "2002:a9fe:a9fe::",
+    "2002:a00:5::1",
+    "2001:0:4136:e378:8000:63bf:3fff:fdd2",
+    "2001:db8::1",
+    "100::1",
+    "fec0::1",
+    "ff02::1",
+    "::ffff:7f00:1",
+    "::7f00:1",
+]
+
+
+@pytest.mark.parametrize("address", NON_PUBLIC)
+def test_non_public_literal_is_refused(address: str) -> None:
+    transport, resolver = FakeTransport(), Resolver()
+    host = f"[{address}]" if ":" in address else address
+    with pytest.raises(PrismError) as caught:
+        Image.from_url(f"http://{host}/x.png").fetch_public(transport=transport, resolver=resolver)
+    assert caught.value.code == ErrorCode.PRIVATE_ADDRESS_REFUSED
+    assert transport.sent == []
+
+
+@pytest.mark.parametrize("address", NON_PUBLIC)
+def test_non_public_dns_answer_is_refused(address: str) -> None:
+    transport, resolver = FakeTransport(), Resolver([address])
+    with pytest.raises(PrismError) as caught:
+        Image.from_url("http://evil.test/x.png").fetch_public(
+            transport=transport, resolver=resolver
+        )
+    assert caught.value.code == ErrorCode.PRIVATE_ADDRESS_REFUSED
+    assert transport.sent == []
+
+
+# The controls. An IPv6-only host behind DNS64 is TOLD 64:ff9b:: addresses for
+# public sites, so refusing NAT64 outright would break every fetch there.
+@pytest.mark.parametrize(
+    "address", ["8.8.8.8", "64:ff9b::808:808", "2002:808:808::1", "2606:4700:4700::1111"]
+)
+def test_public_answers_still_fetch_including_nat64_and_6to4(address: str) -> None:
+    transport, resolver = FakeTransport(), Resolver([address])
+    image = Image.from_url("https://public.test/x.png")
+    assert image.fetch_public(transport=transport, resolver=resolver) is image
+    assert len(transport.sent) == 1
