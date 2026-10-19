@@ -68,6 +68,12 @@ class HttpRequest:
     # Guarded media requests inspect each redirect before sending the next hop.
     # A Transport implementation must honor this flag when it is false.
     follow_redirects: bool = True
+    # When set, read at most this many bytes of the body plus ONE, so the caller
+    # can tell "over the cap" without the transport holding all of it; and read
+    # nothing when a declared Content-Length is already over it. Guarded media
+    # relies on this to bound an answer it does not trust (G-90). A Transport
+    # that ignores it is still refused by the caller, after the memory is spent.
+    max_body_bytes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -121,20 +127,33 @@ class UrllibTransport:
                 else urllib.request.build_opener(_NoRedirect()).open
             )
             with open_request(raw, timeout=request.timeout) as response:
+                headers = {fold_header_name(key): value for key, value in response.headers.items()}
                 return HttpResponse(
                     status=response.status,
-                    body=response.read(),
-                    headers={
-                        fold_header_name(key): value for key, value in response.headers.items()
-                    },
+                    body=_bounded_read(response, headers, request.max_body_bytes),
+                    headers=headers,
                 )
         except urllib.error.HTTPError as error:
             with error:
+                headers = {fold_header_name(key): value for key, value in error.headers.items()}
                 return HttpResponse(
                     status=error.code,
-                    body=error.read(),
-                    headers={fold_header_name(key): value for key, value in error.headers.items()},
+                    body=_bounded_read(error, headers, request.max_body_bytes),
+                    headers=headers,
                 )
+
+
+def _bounded_read(source: Any, headers: dict[str, str], limit: int | None) -> bytes:
+    """The body, or at most ``limit + 1`` bytes of it.
+
+    Nothing is read when a declared Content-Length is already over ``limit``.
+    """
+    if limit is None:
+        return bytes(source.read())
+    declared = headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > limit:
+        return b""
+    return bytes(source.read(limit + 1))
 
 
 @dataclass

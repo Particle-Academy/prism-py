@@ -372,3 +372,100 @@ def test_public_answers_still_fetch_including_nat64_and_6to4(address: str) -> No
     image = Image.from_url("https://public.test/x.png")
     assert image.fetch_public(transport=transport, resolver=resolver) is image
     assert len(transport.sent) == 1
+
+
+# G-90. The URL is one the caller does not trust, so the size of its answer is
+# not theirs to choose either. The cap reaches the TRANSPORT, which reads at most
+# one byte past it, so an oversized answer is never held whole.
+@pytest.fixture
+def endless_server() -> Iterator[str]:
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(200)
+            if self.path == "/declared":
+                self.send_header("Content-Length", "999999999")
+            self.end_headers()
+            try:
+                while True:
+                    self.wfile.write(b"x" * 65536)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.daemon_threads = True
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_the_default_transport_reads_at_most_one_byte_past_the_cap(endless_server: str) -> None:
+    response = UrllibTransport().send(
+        HttpRequest("GET", endless_server + "/endless", max_body_bytes=4096)
+    )
+    assert len(response.body) == 4097
+
+
+def test_the_default_transport_reads_nothing_past_a_declared_length_over_the_cap(
+    endless_server: str,
+) -> None:
+    response = UrllibTransport().send(
+        HttpRequest("GET", endless_server + "/declared", max_body_bytes=4096)
+    )
+    assert response.body == b""
+    assert response.headers["content-length"] == "999999999"
+
+
+class SizedTransport:
+    def __init__(self, body: bytes, headers: dict[str, str] | None = None) -> None:
+        self.body, self.headers = body, headers or {}
+        self.sent: list[HttpRequest] = []
+
+    def send(self, request: HttpRequest) -> HttpResponse:
+        self.sent.append(request)
+        return HttpResponse(200, self.body, self.headers)
+
+
+def test_fetch_public_refuses_a_body_over_the_cap_and_asks_the_transport_to_bound_it() -> None:
+    transport = SizedTransport(b"x" * 4097)
+    with pytest.raises(PrismError) as caught:
+        Image.from_url("https://public.test/x.png").fetch_public(
+            transport=transport, resolver=Resolver(), max_bytes=4096
+        )
+    assert caught.value.code == ErrorCode.MEDIA_TOO_LARGE
+    assert transport.sent[0].max_body_bytes == 4096
+
+
+def test_fetch_public_refuses_a_declared_length_over_the_cap() -> None:
+    transport = SizedTransport(b"", {"Content-Length": "999999999"})
+    with pytest.raises(PrismError) as caught:
+        Image.from_url("https://public.test/x.png").fetch_public(
+            transport=transport, resolver=Resolver(), max_bytes=4096
+        )
+    assert caught.value.code == ErrorCode.MEDIA_TOO_LARGE
+
+
+def test_fetch_public_accepts_a_body_exactly_at_the_cap() -> None:
+    image = Image.from_url("https://public.test/x.png")
+    assert (
+        image.fetch_public(
+            transport=SizedTransport(b"x" * 4096), resolver=Resolver(), max_bytes=4096
+        )
+        is image
+    )
+
+
+def test_fetch_public_caps_at_32_mib_by_default() -> None:
+    transport = SizedTransport(b"x" * (32 * 1024 * 1024 + 1))
+    with pytest.raises(PrismError) as caught:
+        Image.from_url("https://public.test/x.png").fetch_public(
+            transport=transport, resolver=Resolver()
+        )
+    assert caught.value.code == ErrorCode.MEDIA_TOO_LARGE
+    assert transport.sent[0].max_body_bytes == 32 * 1024 * 1024

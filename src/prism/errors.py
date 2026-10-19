@@ -39,6 +39,8 @@ class ErrorCode(str, Enum):
     HOST_DID_NOT_RESOLVE = "host_did_not_resolve"
     REDIRECT_REFUSED = "redirect_refused"
     TOO_MANY_REDIRECTS = "too_many_redirects"
+    #: A guarded fetch's answer was larger than ``max_bytes`` (G-90).
+    MEDIA_TOO_LARGE = "media_too_large"
     UNFETCHABLE_MEDIA = "unfetchable_media"
 
 

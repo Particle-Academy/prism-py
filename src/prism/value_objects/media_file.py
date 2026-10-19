@@ -196,12 +196,18 @@ class Media:
         transport: Transport | None = None,
         resolver: HostResolver | None = None,
         max_redirects: int = 5,
+        max_bytes: int = 32 * 1024 * 1024,
     ) -> Media:
         """Explicit guarded fetch, checking every destination before HTTP.
 
         The transport must honor HttpRequest.follow_redirects=False. The default
         urllib transport does so; each hop is validated here. DNS answers are
         not pinned to the connection, so DNS rebinding remains possible.
+
+        BOUNDED (G-90): the answer is refused with ``media_too_large`` past
+        ``max_bytes`` (default 32 MiB, the largest inline document the providers
+        take). The transport is asked to read at most one byte past it, and a
+        declared Content-Length over it is refused.
         """
         if self.url is None:
             raise PrismError(ErrorCode.UNFETCHABLE_MEDIA, "This payload has no url.")
@@ -211,6 +217,8 @@ class Media:
             or max_redirects < 0
         ):
             raise ValueError("max_redirects must be a nonnegative integer.")
+        if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 0:
+            raise ValueError("max_bytes must be a nonnegative integer.")
         client = transport if transport is not None else UrllibTransport()
         dns = resolver if resolver is not None else DnsHostResolver()
         url = self.url
@@ -228,7 +236,9 @@ class Media:
                         f"{_safe_url(self.url)} redirected to a refused destination.",
                     ) from None
                 raise
-            response = client.send(HttpRequest("GET", url, follow_redirects=False))
+            response = client.send(
+                HttpRequest("GET", url, follow_redirects=False, max_body_bytes=max_bytes)
+            )
             headers = {fold_header_name(key): value for key, value in response.headers.items()}
             location = headers.get("location")
             if 300 <= response.status < 400 and location:
@@ -250,6 +260,12 @@ class Media:
                     ErrorCode.UNFETCHABLE_MEDIA,
                     f"{_safe_url(url)} responded {response.status}.",
                     status=response.status,
+                )
+            declared = headers.get("content-length", "")
+            if (declared.isdigit() and int(declared) > max_bytes) or len(response.body) > max_bytes:
+                raise PrismError(
+                    ErrorCode.MEDIA_TOO_LARGE,
+                    f"{_safe_url(url)} answered with more than the {max_bytes}-byte cap.",
                 )
             self._raw_content = response.body
             self._base64 = None

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "prism-ai-core"
-version = "0.2.0"
+version = "0.3.0"
 description = "Python port of Prism — a unified API layer over LLM providers."
 readme = "README.md"
 license = "MIT"
