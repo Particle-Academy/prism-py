@@ -32,6 +32,14 @@ back. Signatures, redacted thinking and encrypted reasoning remain opaque and
 unchanged; avoid logging these values. The legacy thinking/signature pair still
 works when full replay metadata is absent.
 
+In 0.5.0, Anthropic EOF before `message_stop` emits non-recoverable
+`incomplete_stream` and a terminal Error event. Provider errors close unfinished
+text and still end with Error; later stop/usage events cannot erase the error.
+Terminal usage stays null unless a final usage delta arrived. Consumers should
+handle these newly observable terminal events. Native event vocabulary and
+payload differences are tracked separately in the
+[stream comparison contract](https://github.com/Particle-Academy/prism-parity/blob/main/docs/streaming-conformance.md).
+
 **Every capability the reference has**, and three of its eighteen providers.
 That is the shape of the remaining drift: one axis, not two.
 

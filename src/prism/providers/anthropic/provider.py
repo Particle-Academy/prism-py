@@ -147,6 +147,8 @@ class Anthropic(Provider):
             if event is not None:
                 yield event
 
+        yield from mapper.finish()
+
     def structured(self, request: StructuredRequest) -> StructuredResponse:
         """Structured output by ASKING, because Anthropic has no schema mode.
 

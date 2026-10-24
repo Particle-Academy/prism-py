@@ -11,8 +11,9 @@ from typing import Any
 
 from prism_conformance import Corpus, compare
 
-from conformance import driver, mutations
+from conformance import driver, mutations, stream_driver
 from conformance.mutations import FAITHFUL
+from prism import canonical
 
 __all__ = ["FAITHFUL", "failing_ids", "run"]
 
@@ -83,6 +84,11 @@ def _run_suite(
 ) -> dict[str, Any]:
     suite = corpus.suite(suite_id)
     kind = str(suite.manifest["kind"])
+    if kind == "stream-parse" and suite.manifest.get("comparison") != {
+        "mode": "stream-properties",
+        "exact_trace_gap": "G-125",
+    }:
+        raise ValueError("Stream property comparison requires the explicit G-125 trace divergence.")
 
     results: list[dict[str, Any]] = []
 
@@ -112,6 +118,23 @@ def _run_case(kind: str, case: dict[str, Any], mutation: mutations.Mutation) -> 
     tolerance = case.get("tolerance")
 
     try:
+        if kind == "stream-parse":
+            trace = stream_driver.parse_stream(case)
+            errors = stream_driver.violations(trace, case["properties"])
+            actual = canonical.encode(trace)
+            match = actual == case["expect"]["result_json"]
+            return {
+                "id": case["id"],
+                "status": "fail" if errors else "pass",
+                "expected": "[]",
+                "actual": canonical.encode(errors),
+                "trace_comparison": {
+                    "status": "match" if match else "known-divergence",
+                    "gap": None if match else "G-125",
+                    "expected": case["expect"]["result_json"],
+                    "actual": actual,
+                },
+            }
         attempts = driver.run_case(kind, case, mutation)
     except Exception as error:
         # A crash is a failed case, not a dead run. A mutant is meant to break

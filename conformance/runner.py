@@ -104,7 +104,8 @@ def main(argv: list[str] | None = None) -> int:
         print(str(error), file=sys.stderr)
         return EXIT_CORPUS
 
-    print(json.dumps(_document(documents), ensure_ascii=False))
+    # ASCII JSON is lossless and survives a Windows stdout using a legacy code page.
+    print(json.dumps(_document(documents), ensure_ascii=True))
 
     return EXIT_FAILURES if _has_failures(documents) else EXIT_OK
 
