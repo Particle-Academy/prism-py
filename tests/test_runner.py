@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -42,6 +45,28 @@ def test_a_single_suite_emits_a_single_document(capsys: pytest.CaptureFixture[st
     assert document["language"] == "py"
     assert document["probe"] == "faithful"
     assert document["corpus_digest"].startswith("sha256:")
+
+
+def test_stream_trace_json_survives_ascii_stdout() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "conformance.runner", *invoke("--suite", "anthropic-text-stream")],
+        cwd=Path(__file__).resolve().parents[1],
+        env={**os.environ, "PYTHONIOENCODING": "ascii"},
+        capture_output=True,
+        encoding="ascii",
+        check=False,
+    )
+    assert result.returncode == runner.EXIT_OK, result.stderr
+    document = json.loads(result.stdout)
+    assert len(document["results"]) == 10
+    assert all(row["status"] == "pass" for row in document["results"])
+    trace = json.loads(document["results"][0]["trace_comparison"]["actual"])
+    assert (
+        "".join(
+            event["payload"]["delta"] for event in trace["events"] if event["type"] == "text_delta"
+        )
+        == "Héllo 🌍"
+    )
 
 
 def test_stderr_carries_the_version_digest_and_root(capsys: pytest.CaptureFixture[str]) -> None:

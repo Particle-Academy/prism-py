@@ -143,12 +143,18 @@ class ErrorEvent(StreamEvent):
 
     code: str = "unknown_error"
     message: str = ""
+    recoverable: bool | None = None
 
     def type(self) -> StreamEventType:
         return StreamEventType.ERROR
 
     def to_dict(self) -> dict[str, Any]:
-        return {**super().to_dict(), "code": self.code, "message": self.message}
+        return {
+            **super().to_dict(),
+            "code": self.code,
+            "message": self.message,
+            **({} if self.recoverable is None else {"recoverable": self.recoverable}),
+        }
 
 
 @dataclass(frozen=True)

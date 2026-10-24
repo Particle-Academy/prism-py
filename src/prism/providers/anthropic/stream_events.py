@@ -53,6 +53,10 @@ class AnthropicStreamMapper:
         self._stop: dict[str, Any] = {}
         self._usage: Usage | None = None
         self._blocks: dict[int, _Block] = {}
+        self._message_stopped = False
+        self._failed = False
+        self._finished = False
+        self._final_usage_reported = False
 
     def map(self, payload: dict[str, Any]) -> StreamEvent | None:
         kind = _str(payload.get("type"))
@@ -69,18 +73,48 @@ class AnthropicStreamMapper:
             self._message_delta(payload)
             return None
         if kind == "message_stop":
-            return StreamEndEvent(finish_reason=self._finish_reason(), usage=self._usage)
+            self._message_stopped = True
+            return None
         if kind == "error":
+            self._failed = True
             return ErrorEvent(
                 code=_str(data_get(payload, "error.type")) or "unknown_error",
                 message=_str(data_get(payload, "error.message"))
                 or "The provider reported an error mid-stream.",
+                recoverable=False,
             )
 
         # `ping`, and anything Anthropic adds later. Ignored rather than fatal,
         # for the same reason the OpenAI mapper ignores what it does not know:
         # a provider's additive change must not become an outage.
         return None
+
+    def finish(self) -> list[StreamEvent]:
+        """EOF is terminal; an unfinished tool block never becomes a call."""
+        if self._finished:
+            return []
+        self._finished = True
+        events: list[StreamEvent] = []
+        if not self._message_stopped and not self._failed:
+            self._failed = True
+            events.append(
+                ErrorEvent(
+                    code="incomplete_stream",
+                    message="The stream ended before Anthropic finished the message.",
+                    recoverable=False,
+                )
+            )
+        for block in self._blocks.values():
+            if block.type == "text":
+                events.append(TextCompleteEvent(text=block.text, message_id=self._message_id))
+        self._blocks.clear()
+        events.append(
+            StreamEndEvent(
+                finish_reason=self._finish_reason(),
+                usage=self._usage if self._final_usage_reported else None,
+            )
+        )
+        return events
 
     def _message_start(self, payload: dict[str, Any]) -> StreamEvent:
         self._message_id = _str(data_get(payload, "message.id"))
@@ -139,6 +173,8 @@ class AnthropicStreamMapper:
         if block is None:
             return None
 
+        del self._blocks[_int(payload.get("index"))]
+
         # Truthful because it was accumulated. Anthropic's `content_block_stop`
         # carries no text of its own, so emitting a complete event without the
         # memory above would mean emitting an empty one.
@@ -165,6 +201,8 @@ class AnthropicStreamMapper:
             # be LOST. Prompt tokens were already carried forward for exactly
             # that reason; cache and thinking counts arrive at message_start and
             # never again, so they need the same carry.
+            if isinstance(usage.get("output_tokens"), int):
+                self._final_usage_reported = True
             carried = self._usage
             thinking = data_get(usage, "output_tokens_details.thinking_tokens")
 
@@ -183,6 +221,9 @@ class AnthropicStreamMapper:
             )
 
     def _finish_reason(self) -> FinishReason:
+        if self._failed:
+            return FinishReason.ERROR
+
         if "stop_reason" not in self._stop:
             return FinishReason.STOP
 

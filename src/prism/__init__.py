@@ -90,7 +90,7 @@ from prism.value_objects import (
 from prism.value_objects.generated_audio import GeneratedAudio
 from prism.value_objects.media_file import Audio, Document, Image, Media, Video
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     "AssistantMessage",
