@@ -373,13 +373,17 @@ def test_keeps_the_thinking_signature_and_sends_the_block_back_first() -> None:
     assert first.additional_content["thinking"] == "first"
     assert first.additional_content["thinking_signature"] == "sig-1"
 
+    # Pin legacy pair replay here; test_replay_metadata covers full stored blocks.
     pending().with_messages(
         [
             UserMessage("Weather?"),
             AssistantMessage(
                 "Checking.",
                 [ToolCall("toolu_1", "weather", {"city": "Detroit"})],
-                first.additional_content,
+                {
+                    "thinking": first.additional_content["thinking"],
+                    "thinking_signature": first.additional_content["thinking_signature"],
+                },
             ),
             ToolResultMessage([ToolResult("toolu_1", "weather", {"city": "Detroit"}, "Sunny")]),
         ]

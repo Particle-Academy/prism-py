@@ -9,6 +9,7 @@ from prism import canonical
 from prism._php import data_get, where_not_null
 from prism.enums import FinishReason, ToolChoice
 from prism.errors import PrismError
+from prism.providers.anthropic.replay import replay_content_blocks
 from prism.tool import Tool
 from prism.value_objects import ToolCall
 from prism.value_objects.media_file import Document, Image
@@ -114,6 +115,12 @@ def map_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
 
 
 def _append_assistant(message: AssistantMessage, items: list[dict[str, Any]]) -> None:
+    replay = message.additional_content.get("content_blocks")
+    if isinstance(replay, list):
+        content_blocks = replay_content_blocks(replay)
+        if content_blocks:
+            items.append({"role": "assistant", "content": content_blocks})
+        return
     content: list[dict[str, Any]] = []
     thinking = message.additional_content.get("thinking")
     signature = message.additional_content.get("thinking_signature")
@@ -121,7 +128,9 @@ def _append_assistant(message: AssistantMessage, items: list[dict[str, Any]]) ->
     # The thinking block goes back FIRST, with its signature. Anthropic requires
     # it on a tool-use turn with thinking on, and refuses a thinking block that
     # has no signature, so without both it is left out (G-57).
-    if isinstance(thinking, str) and isinstance(signature, str):
+    if isinstance(message.additional_content.get("thinking_blocks"), list):
+        content.extend(message.additional_content["thinking_blocks"])
+    elif isinstance(thinking, str) and isinstance(signature, str):
         content.append({"type": "thinking", "thinking": thinking, "signature": signature})
 
     # Text next. Anthropic reads blocks in order, and a tool_use ahead of the

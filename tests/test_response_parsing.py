@@ -151,7 +151,11 @@ def test_reasoning_summaries_are_collected_and_do_not_become_the_answer() -> Non
     )
 
     assert response.text == "The answer is four."
-    assert response.additional_content == {"reasoningSummaries": ["Consider the two cases."]}
+    assert response.raw is not None
+    assert response.additional_content == {
+        "reasoningSummaries": ["Consider the two cases."],
+        "output_items": response.raw["output"],
+    }
 
 
 def test_the_messages_include_the_trailing_assistant_turn() -> None:
