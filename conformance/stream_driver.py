@@ -95,6 +95,13 @@ def violations(trace: dict[str, Any], properties: dict[str, Any]) -> list[str]:
     text = "".join(event["payload"]["delta"] for event in events if event["type"] == "text_delta")
     if text != properties["text"]:
         failed.append("text")
+    starts = [event for event in events if event["type"] == "text_start"]
+    completes = [event for event in events if event["type"] == "text_complete"]
+    if (
+        len(starts) != len(completes)
+        or "".join(event["payload"]["text"] for event in completes) != properties["text"]
+    ):
+        failed.append("text_completion")
     if (
         len(ends) != properties["terminal_events"]
         or not events
@@ -122,7 +129,8 @@ def violations(trace: dict[str, Any], properties: dict[str, Any]) -> list[str]:
         failed.append("no_completed_tools")
     if len(ends) == 1:
         payload = ends[0]["payload"]
-        if (payload.get("finish_reason") in {"Stop", "stop"}) != properties["normal_completion"]:
+        accepted = {"Stop", "stop"} if properties["normal_completion"] else {"Error", "error"}
+        if payload.get("finish_reason") not in accepted:
             failed.append("normal_completion")
         if (
             "usage_known" in properties
