@@ -13,6 +13,7 @@ from prism.providers.openai.maps import (
     map_provider_tool_calls,
     map_tool_calls,
 )
+from prism.providers.openai.replay import response_replay_items
 from prism.text.request import Request
 from prism.text.response import Response
 from prism.text.response_builder import ResponseBuilder
@@ -129,6 +130,7 @@ def _build_additional_content(output: Sequence[Mapping[str, Any]]) -> dict[str, 
             "reasoningSummaries": _reasoning_summaries(output),
             "generatedImages": _generated_images(output) or None,
             "imageGenerationCalls": _image_generation_calls(output) or None,
+            "output_items": response_replay_items(output) or None,
         }
     )
 

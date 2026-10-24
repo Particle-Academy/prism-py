@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from prism.enums import ToolChoice
+from prism.providers.anthropic import request_body as anthropic_request_body_module
 from prism.providers.anthropic import response as anthropic_response_module
 from prism.providers.openai import request_body as request_body_module
 from prism.providers.openai import response as response_module
@@ -203,6 +204,21 @@ def _keep_empty_tools(original: Callable[[Any], list[Any]]) -> Callable[[Any], l
     return build_tools
 
 
+def _install_keep_empty_tools() -> Callable[[], None]:
+    # Both native request builders are now driven by the shared corpus. Patch
+    # their real decision points, retaining the probe's provider-neutral scope.
+    undos = [
+        _wrapping_installer(request_body_module, "build_tools", _keep_empty_tools)(),
+        _wrapping_installer(anthropic_request_body_module, "map_tools", _keep_empty_tools)(),
+    ]
+
+    def undo() -> None:
+        for restore in reversed(undos):
+            restore()
+
+    return undo
+
+
 def _provider_tools_last(
     original: Callable[[Any], list[dict[str, Any]]],
 ) -> Callable[[Any], list[dict[str, Any]]]:
@@ -309,7 +325,7 @@ _MUTATIONS: dict[str, Mutation] = {
     ),
     "keep-empty-tools": Mutation(
         id="keep-empty-tools",
-        install=_wrapping_installer(request_body_module, "build_tools", _keep_empty_tools),
+        install=_install_keep_empty_tools,
     ),
     "tool-choice-any-verbatim": Mutation(
         id="tool-choice-any-verbatim",

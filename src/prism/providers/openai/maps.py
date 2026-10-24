@@ -9,6 +9,7 @@ from prism import canonical
 from prism._php import data_get, is_truthy, strval
 from prism.enums import FinishReason, ToolChoice
 from prism.errors import PrismError
+from prism.providers.openai.replay import replayable_items
 from prism.providers.support import data_uri
 from prism.tool import Tool
 from prism.value_objects import (
@@ -140,6 +141,9 @@ def _map_document(document: Document) -> dict[str, Any]:
 
 
 def _map_assistant_message(message: AssistantMessage) -> list[dict[str, Any]]:
+    replay = message.additional_content.get("output_items")
+    if isinstance(replay, list) and replay:
+        return replayable_items(replay)
     mapped: list[dict[str, Any]] = []
 
     if message.tool_calls:

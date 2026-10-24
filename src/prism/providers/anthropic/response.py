@@ -9,6 +9,7 @@ from prism._php import data_get, where_not_null
 from prism.enums import FinishReason
 from prism.errors import PrismError
 from prism.providers.anthropic.maps import map_finish_reason, map_tool_calls
+from prism.providers.anthropic.replay import response_content_blocks, thinking_blocks
 from prism.text.request import Request
 from prism.text.response import Response
 from prism.text.response_builder import ResponseBuilder
@@ -90,6 +91,7 @@ def _build_step(
     rate_limits: Sequence[ProviderRateLimit],
 ) -> Step:
     content: Sequence[Mapping[str, Any]] = data_get(data, "content", []) or []
+    replay = response_content_blocks(content, data.get("stop_reason") == "pause_turn")
 
     return Step(
         text=_output_text(content),
@@ -110,7 +112,9 @@ def _build_step(
         system_prompts=list(request.system_prompts),
         additional_content=where_not_null(
             {
-                **_thinking(content),
+                **_thinking(replay),
+                "content_blocks": replay if data.get("content") is not None else None,
+                "stop_reason": data_get(data, "stop_reason"),
                 "stopSequence": data_get(data, "stop_sequence"),
             }
         ),
@@ -130,20 +134,24 @@ def _output_text(content: Sequence[Mapping[str, Any]]) -> str:
     )
 
 
-def _thinking(content: Sequence[Mapping[str, Any]]) -> dict[str, str | None]:
+def _thinking(content: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """The first thinking block's text and signature, as the reference keeps them.
 
     The signature is what lets the block be sent back on a later tool-use turn
     (G-57). It covers one block's text exactly, so the text kept beside it is
     that block's, not every block joined: joined text under one signature is a
-    block Anthropic would refuse. A response with more than one thinking block
-    keeps only the first, in all three languages.
+    block Anthropic would refuse. The convenience pair describes the first
+    thinking block; thinking_blocks retains every signed or redacted block.
     """
-    block = next((block for block in content if data_get(block, "type") == "thinking"), None)
+    blocks = thinking_blocks(content)
+    if not blocks:
+        return {}
+    block = next((block for block in blocks if data_get(block, "type") == "thinking"), None)
     text = data_get(block, "thinking") if block is not None else None
     signature = data_get(block, "signature") if block is not None else None
 
     return {
+        "thinking_blocks": blocks,
         "thinking": text if isinstance(text, str) else None,
         "thinking_signature": signature if isinstance(signature, str) else None,
     }

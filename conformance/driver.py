@@ -18,6 +18,9 @@ from prism import canonical
 from prism.enums import ToolChoice
 from prism.errors import PrismError
 from prism.providers.anthropic import parse_text_response as parse_anthropic_text_response
+from prism.providers.anthropic.request_body import (
+    build_request_body as build_anthropic_request_body,
+)
 from prism.providers.openai import build_request_body, parse_text_response
 from prism.schema import BooleanSchema, NumberSchema, Schema, StringSchema
 from prism.text import PendingRequest
@@ -230,7 +233,12 @@ def run_case(kind: str, case: Mapping[str, Any], mutation: mutations.Mutation) -
 def _request_body(case: Mapping[str, Any], mutation: mutations.Mutation) -> dict[str, Any]:
     request = build_pending(case["builder"]).to_request()
 
-    return mutation.request_body(build_request_body(request))
+    body = (
+        build_anthropic_request_body(request)
+        if request.provider_key == "anthropic"
+        else build_request_body(request)
+    )
+    return mutation.request_body(body)
 
 
 def _run_request_payload(case: Mapping[str, Any], mutation: mutations.Mutation) -> list[Attempt]:
