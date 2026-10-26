@@ -402,6 +402,15 @@ def probe_ecosystem() -> dict[str, Any]:
         ),
         "reserved for the human|well-formed",
     )
+    # G-130. The name rule admits `.`, `:` and `-`, and the reservation used to
+    # look for the verb only behind `_`, so `terminal.confirm` went to the agent
+    # in all three languages while the two probes above stayed green.
+    human_only_separator = _refuses(
+        lambda: hp.TrustPolicy.every_tool().assert_allows(
+            hp.ToolDefinition("terminal.confirm", "", {})
+        ),
+        "reserved for the human",
+    )
     # Cyrillic U+0441. It is not the reserved word, so the reservation correctly
     # does not fire -- the refusal has to come from the name rule, or an
     # allowlist a human reads is lying to them.
@@ -435,6 +444,11 @@ def probe_ecosystem() -> dict[str, Any]:
     is_(
         "and still does when the SURFACE pads the name",
         human_only_padded,
+        {"refused": True, "message": "as expected"},
+    )
+    is_(
+        "and when the SURFACE spells it with another separator",
+        human_only_separator,
         {"refused": True, "message": "as expected"},
     )
     is_(
