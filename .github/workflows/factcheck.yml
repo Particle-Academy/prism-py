@@ -12,6 +12,7 @@ on:
   push:
     branches: [main, "*.x"]
   pull_request:
+  workflow_dispatch:
   # Claims rot without anything here changing — a sibling renames a class, a
   # package gets published. The nightly notices.
   schedule:
@@ -47,9 +48,9 @@ jobs:
       - name: Check claims
         run: node .parity/tools/factcheck.mjs
 
-      # --strict promotes version drift from a warning to a failure. Nightly
-      # only, so a release elsewhere cannot redden an unrelated pull request
-      # here while currency is still enforced every day.
+      # --strict promotes version drift from a warning to a failure. Run it
+      # nightly and on manual dispatch; push and pull-request checks keep
+      # reporting drift without blocking unrelated changes.
       - name: Check currency
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: node .parity/tools/factcheck.mjs --strict
