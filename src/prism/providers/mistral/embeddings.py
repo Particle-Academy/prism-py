@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from prism._embedding_decoder import decode_embedding
 from prism._php import data_get
 from prism.embeddings.request import EmbeddingsRequest
 from prism.embeddings.response import EmbeddingsResponse
 from prism.providers.mistral.response import validate_response
-from prism.value_objects.embedding import Embedding, EmbeddingsUsage
+from prism.value_objects.embedding import EmbeddingsUsage
 from prism.value_objects.meta import Meta
 
 __all__ = ["build_embeddings_body", "parse_embeddings_response"]
@@ -42,7 +43,7 @@ def parse_embeddings_response(raw_body: Any) -> EmbeddingsResponse:
     ordered = sorted(items, key=lambda item: _number(item.get("index")))
 
     return EmbeddingsResponse(
-        embeddings=tuple(Embedding.from_list(item.get("embedding") or []) for item in ordered),
+        embeddings=tuple(decode_embedding(item.get("embedding")) for item in ordered),
         # Mistral reports `total_tokens` only.
         usage=_usage(data_get(data, "usage.total_tokens")),
         meta=Meta(id=_string(data.get("id")), model=_string(data.get("model"))),

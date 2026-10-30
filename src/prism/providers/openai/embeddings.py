@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from prism._embedding_decoder import decode_embedding
 from prism.embeddings.request import EmbeddingsRequest
 from prism.embeddings.response import EmbeddingsResponse
 from prism.errors import PrismError
-from prism.value_objects.embedding import Embedding, EmbeddingsUsage
+from prism.value_objects.embedding import EmbeddingsUsage
 from prism.value_objects.meta import Meta
 
 __all__ = ["build_embeddings_body", "parse_embeddings_response"]
@@ -46,12 +47,7 @@ def parse_embeddings_response(raw_body: Any) -> EmbeddingsResponse:
     items.sort(key=_index)
 
     return EmbeddingsResponse(
-        embeddings=tuple(
-            Embedding.from_list(
-                item["embedding"] if isinstance(item.get("embedding"), list) else []
-            )
-            for item in items
-        ),
+        embeddings=tuple(decode_embedding(item.get("embedding")) for item in items),
         usage=EmbeddingsUsage(_tokens(raw_body)),
         meta=Meta(id=_str(raw_body.get("id")), model=_str(raw_body.get("model"))),
         raw=raw_body,

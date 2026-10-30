@@ -27,6 +27,7 @@ class ErrorCode(str, Enum):
     MISSING_SCHEMA = "missing_schema"
     UNSUPPORTED_STRUCTURED_MODEL = "unsupported_structured_model"
     NO_EMBEDDING_INPUT = "no_embedding_input"
+    INVALID_EMBEDDING = "invalid_embedding"
     UNREADABLE_INPUT_FILE = "unreadable_input_file"
     NO_IMAGE_PROMPT = "no_image_prompt"
     NO_MODERATION_INPUT = "no_moderation_input"
