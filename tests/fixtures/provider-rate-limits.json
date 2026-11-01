@@ -749,7 +749,7 @@
             "id": "prl-0015",
             "title": "a Mistral response that carried no rate-limit headers",
             "since": "0.1.0",
-            "notes": "ADVERSARIAL toward the reference. Casting an absent header to an integer yields a bucket reading limit 0, remaining 0, resets now: a provider that said nothing, reported as exhausted and ready to retry immediately. A caller cannot tell that apart from real exhaustion, and both readings of it are wrong.",
+            "notes": "Regression for an absent Mistral quota header set. Published PHP 0.144.2 emits no bucket, matching both ports. The previous synthetic exhausted bucket is closed for this row; offset and other declared divergences remain separate.",
             "given": {
                 "provider": "mistral",
                 "now": 1787656500,
@@ -760,14 +760,7 @@
             "result": {
                 "php": {
                     "outcome": "ok",
-                    "buckets": [
-                        {
-                            "name": "tokens",
-                            "limit": 0,
-                            "remaining": 0,
-                            "resets_at": "2026-08-25T11:15:00+00:00"
-                        }
-                    ]
+                    "buckets": []
                 },
                 "ts": {
                     "outcome": "ok",
@@ -778,7 +771,7 @@
                     "buckets": []
                 }
             },
-            "agrees": false
+            "agrees": true
         },
         {
             "id": "prl-0016",
