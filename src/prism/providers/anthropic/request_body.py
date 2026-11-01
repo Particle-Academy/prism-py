@@ -5,16 +5,18 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from prism._php import where_not_null
+from prism._php import is_truthy, where_not_null
+from prism.errors import ErrorCode, PrismError
 from prism.providers.anthropic.maps import (
     map_messages,
     map_system,
     map_tool_choice,
     map_tools,
 )
+from prism.structured.request import StructuredRequest
 from prism.text.request import Request
 
-__all__ = ["DEFAULT_MAX_TOKENS", "build_request_body"]
+__all__ = ["DEFAULT_MAX_TOKENS", "build_request_body", "build_structured_body"]
 
 #: Anthropic requires ``max_tokens`` and documents no default.
 #:
@@ -68,6 +70,24 @@ def build_request_body(request: Request) -> dict[str, Any]:
 
     body.update(where_not_null(optional))
 
+    return body
+
+
+def build_structured_body(request: StructuredRequest) -> dict[str, Any]:
+    """Native schema mode; unsupported modes are refused before transport."""
+    if is_truthy(request.provider_option("use_tool_calling")):
+        raise PrismError.unsupported_provider_action("Structured tool calling", "Anthropic")
+    if request.provider_option("citations") is True:
+        raise PrismError.unsupported_provider_action(
+            "Citations with native structured output", "Anthropic"
+        )
+    if request.schema is None:
+        raise PrismError(ErrorCode.MISSING_SCHEMA, "A structured request needs a schema.")
+    body = build_request_body(request)
+    body["output_config"] = {
+        **body.get("output_config", {}),
+        "format": {"type": "json_schema", "schema": request.schema.to_dict()},
+    }
     return body
 
 

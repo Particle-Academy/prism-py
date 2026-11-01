@@ -561,7 +561,9 @@ class OpenAI(Provider):
                 body=response.body.decode("utf-8", errors="replace"),
             )
 
-        return parse_text_response(request, decoded, parse_rate_limits(response.headers))
+        return parse_text_response(
+            request, decoded, parse_rate_limits(response.headers), structured=action == "structured"
+        )
 
     def structured(self, request: StructuredRequest) -> StructuredResponse:
         """Structured output through the Responses API's schema format.
@@ -570,7 +572,9 @@ class OpenAI(Provider):
         reading, so finish reasons, token-limit failures, usage and rate limits
         behave identically on both paths by construction.
         """
-        return structured_from_text_response(self._send(build_structured_body(request), request))
+        return structured_from_text_response(
+            self._send(build_structured_body(request), request), parsed_step=True
+        )
 
     # -- internals ---------------------------------------------------------
 

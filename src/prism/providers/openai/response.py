@@ -28,6 +28,8 @@ def parse_text_response(
     request: Request,
     raw_body: Mapping[str, Any],
     rate_limits: Sequence[ProviderRateLimit] = (),
+    *,
+    structured: bool = False,
 ) -> Response:
     """Parse a raw Responses body, with no HTTP involved.
 
@@ -51,7 +53,7 @@ def parse_text_response(
         )
 
     builder = ResponseBuilder()
-    builder.add_step(_build_step(raw_body, request, finish_reason, rate_limits))
+    builder.add_step(_build_step(raw_body, request, finish_reason, rate_limits, structured))
 
     return builder.to_response()
 
@@ -71,6 +73,7 @@ def _build_step(
     request: Request,
     finish_reason: FinishReason,
     rate_limits: Sequence[ProviderRateLimit] = (),
+    structured: bool = False,
 ) -> Step:
     output: list[Mapping[str, Any]] = list(data_get(data, "output", []) or [])
 
@@ -96,7 +99,7 @@ def _build_step(
         ),
         messages=list(request.messages),
         system_prompts=list(request.system_prompts),
-        additional_content=_build_additional_content(output),
+        additional_content=_build_additional_content(output, structured=structured),
         raw=dict(data),
     )
 
@@ -116,12 +119,16 @@ def _build_usage(data: Mapping[str, Any]) -> Usage:
     )
 
 
-def _build_additional_content(output: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def _build_additional_content(
+    output: Sequence[Mapping[str, Any]], *, structured: bool = False
+) -> dict[str, Any]:
     """Everything the response carried besides the answer itself.
 
     Citation extraction would sit first in this mapping; it is outside this
     slice, and a null entry is dropped by the not-null filter anyway.
     """
+    if structured:
+        return where_not_null({"output_items": response_replay_items(output) or None})
     return where_not_null(
         {
             "searchQueries": _web_search_actions(output, "search", "query") or None,

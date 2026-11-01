@@ -17,12 +17,18 @@ from conformance import mutations
 from prism import canonical
 from prism.enums import ToolChoice
 from prism.errors import PrismError
+from prism.http import HttpRequest, HttpResponse
+from prism.providers.anthropic import Anthropic
 from prism.providers.anthropic import parse_text_response as parse_anthropic_text_response
 from prism.providers.anthropic.request_body import (
     build_request_body as build_anthropic_request_body,
 )
-from prism.providers.openai import build_request_body, parse_text_response
-from prism.schema import BooleanSchema, NumberSchema, Schema, StringSchema
+from prism.providers.mistral import Mistral
+from prism.providers.openai import OpenAI, build_request_body, parse_text_response
+from prism.schema import BooleanSchema, NumberSchema, ObjectSchema, Schema, StringSchema
+from prism.structured.pending_request import StructuredPendingRequest
+from prism.structured.request import StructuredRequest
+from prism.structured.response import StructuredResponse
 from prism.text import PendingRequest
 from prism.tool import Tool
 from prism.value_objects import (
@@ -105,6 +111,17 @@ def hydrate(value: Any) -> Any:
 
     if tag == "Tool":
         return _tool(value)
+
+    if tag == "StringSchema":
+        return StringSchema(value["name"], value["description"])
+
+    if tag == "ObjectSchema":
+        return ObjectSchema(
+            value["name"],
+            value["description"],
+            tuple(hydrate(item) for item in value.get("properties", [])),
+            tuple(value.get("requiredFields", [])),
+        )
 
     if tag in _MEDIA:
         return _media(value)
@@ -194,13 +211,18 @@ def _tool(spec: Mapping[str, Any]) -> Tool:
     return tool
 
 
-def build_pending(script: Sequence[Mapping[str, Any]]) -> PendingRequest:
+def build_pending(script: Sequence[Mapping[str, Any]]) -> PendingRequest | StructuredPendingRequest:
     """Replay a builder script against a fresh pending request."""
     from prism import Prism
 
-    pending = Prism.text()
+    structured = bool(script) and script[0].get("call") == "structured"
+    if structured and script[0].get("args"):
+        raise DriverError("The structured factory takes no arguments.")
+    pending: PendingRequest | StructuredPendingRequest = (
+        Prism.structured() if structured else Prism.text()
+    )
 
-    for step in script:
+    for step in script[1:] if structured else script:
         name = _snake(str(step["call"]))
         method = getattr(pending, name, None)
 
@@ -262,12 +284,62 @@ def _parser_for(script: Sequence[Mapping[str, Any]]) -> Any:
         None,
     )
 
+    if script[0].get("call") == "structured":
+        if provider not in ("openai", "anthropic", "mistral"):
+            raise DriverError(f"No structured response-parse handler for {provider!r}.")
+        return lambda request, response: _parse_structured(provider, request, response)
     if provider == "openai":
         return parse_text_response
     if provider == "anthropic":
         return parse_anthropic_text_response
 
     raise DriverError(f"No response-parse handler wired for provider {provider!r}.")
+
+
+class _ResponseTransport:
+    """Replay the fixture through the native provider without network access."""
+
+    def __init__(self, response: Mapping[str, Any], endpoint: str) -> None:
+        self.response = response
+        self.endpoint = endpoint
+        self.calls = 0
+
+    def send(self, request: HttpRequest) -> HttpResponse:
+        if (
+            request.url != "https://conformance.invalid/v1" + self.endpoint
+            or request.method != "POST"
+        ):
+            raise DriverError("Unexpected structured fixture request.")
+        self.calls += 1
+        return HttpResponse(
+            status=200,
+            headers={},
+            body=canonical.encode(self.response).encode("utf-8"),
+        )
+
+
+def _parse_structured(
+    provider_name: str,
+    request: StructuredRequest,
+    response: Mapping[str, Any],
+) -> StructuredResponse:
+    providers = {
+        "openai": (OpenAI, "/responses"),
+        "anthropic": (Anthropic, "/messages"),
+        "mistral": (Mistral, "/chat/completions"),
+    }
+    provider, endpoint = providers[provider_name]
+    transport = _ResponseTransport(response, endpoint)
+    parsed = provider(
+        api_key="conformance-only",
+        url="https://conformance.invalid/v1",
+        transport=transport,
+    ).structured(request)
+    if not isinstance(parsed, StructuredResponse):
+        raise DriverError("The native handler did not return a StructuredResponse.")
+    if transport.calls != 1:
+        raise DriverError("The structured fixture must make exactly one request.")
+    return parsed
 
 
 def _run_response_parse(case: Mapping[str, Any], mutation: mutations.Mutation) -> list[Attempt]:
