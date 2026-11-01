@@ -51,7 +51,7 @@ def dispatch(method: str | None, params: dict[str, Any] | None) -> dict[str, Any
             "protocolVersion": PROTOCOL_VERSION,
             "supportedVersions": [PROTOCOL_VERSION],
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": f"prism.{LANGUAGE}", "version": "0.1.0"},
+            "serverInfo": {"name": f"prism.{LANGUAGE}", "version": "0.6.0"},
         }
 
     if method == "tools/list":
