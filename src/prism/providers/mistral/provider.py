@@ -92,17 +92,12 @@ class Mistral(Provider):
         return parse_text_response(request, decoded, parse_rate_limits(headers))
 
     def structured(self, request: StructuredRequest) -> StructuredResponse:
-        """Structured output through Mistral's OWN strict schema mode.
-
-        So this is enforced, not requested -- the same guarantee the OpenAI path
-        gives and stronger than the Anthropic one, which can only ask. G-08
-        records that ``structured`` means different things per provider; Mistral
-        lands on the strong side of it.
-        """
+        """Structured output through Mistral's JSON schema response format."""
         decoded, headers = self._send("chat/completions", build_structured_body(request))
 
         return structured_from_text_response(
-            parse_text_response(request, decoded, parse_rate_limits(headers))
+            parse_text_response(request, decoded, parse_rate_limits(headers)),
+            assistant_additional_content=False,
         )
 
     def fim(self, request: FimRequest) -> FimResponse:

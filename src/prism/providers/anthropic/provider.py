@@ -19,7 +19,7 @@ from prism.http import (
     UrllibTransport,
 )
 from prism.providers.anthropic.rate_limits import parse_rate_limits
-from prism.providers.anthropic.request_body import build_request_body
+from prism.providers.anthropic.request_body import build_request_body, build_structured_body
 from prism.providers.anthropic.response import parse_text_response
 from prism.providers.anthropic.stream_events import AnthropicStreamMapper
 from prism.providers.base import Provider
@@ -30,7 +30,6 @@ from prism.structured.request import StructuredRequest
 from prism.structured.response import StructuredResponse
 from prism.text.request import Request
 from prism.text.response import Response
-from prism.value_objects.messages import UserMessage
 
 __all__ = ["Anthropic"]
 
@@ -81,7 +80,10 @@ class Anthropic(Provider):
         self._stream_transport: StreamTransport = stream_transport or UrllibStreamTransport()
 
     def text(self, request: Request) -> Response:
-        body = canonical.encode(build_request_body(request)).encode("utf-8")
+        return self._send(request, build_request_body(request))
+
+    def _send(self, request: Request, payload: dict[str, Any]) -> Response:
+        body = canonical.encode(payload).encode("utf-8")
         response = self._transport.send(
             HttpRequest(
                 method="POST",
@@ -150,22 +152,10 @@ class Anthropic(Provider):
         yield from mapper.finish()
 
     def structured(self, request: StructuredRequest) -> StructuredResponse:
-        """Structured output by ASKING, because Anthropic has no schema mode.
-
-        OpenAI can be told to enforce a schema; Anthropic cannot, so the
-        reference appends a message spelling out the schema and demanding JSON
-        with nothing around it. That is a request, not a guarantee -- which is
-        exactly why ``structured`` is optional and ``text`` survives beside it.
-        A model that answers in prose here has not malfunctioned; it has
-        declined, and the caller gets to see what it said.
-
-        Appended as a USER message rather than a system prompt, matching the
-        reference: the caller's own system prompt keeps its meaning, and the
-        demand arrives as the most recent thing said.
-        """
-        request.messages = [*request.messages, UserMessage(_schema_instruction(request))]
-
-        return structured_from_text_response(self.text(request))
+        """Structured output through Anthropic's native output_config.format."""
+        return structured_from_text_response(
+            self._send(request, build_structured_body(request)), native_output_format=True
+        )
 
     # -- internals ---------------------------------------------------------
 
@@ -202,27 +192,6 @@ class Anthropic(Provider):
             )
 
         return decoded
-
-
-def _schema_instruction(request: StructuredRequest) -> str:
-    """The message that asks for JSON and nothing else.
-
-    Wording tracks the reference deliberately, including the parenthetical
-    about backticks: models fence JSON by habit, and the phrasing is the only
-    lever there is. ``extract_structured`` still unfences as a second line of
-    defence, because a plea is not a guarantee.
-    """
-    # The builder refuses a request without a schema, so this cannot be None
-    # by the time a provider sees it.
-    schema = request.schema
-    if schema is None:  # pragma: no cover - defensive
-        raise ValueError("A structured request reached the provider without a schema.")
-
-    return (
-        "Respond with ONLY JSON (i.e. not in backticks or a code block, with NO "
-        "CONTENT outside the JSON) that matches the following schema: \n "
-        + json.dumps(schema.to_dict(), indent=2)
-    )
 
 
 def _loads(text: str) -> dict[str, Any]:

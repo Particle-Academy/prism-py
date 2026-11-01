@@ -6,10 +6,12 @@ from prism.structured.extract import extract_structured
 from prism.structured.pending_request import StructuredPendingRequest
 from prism.structured.request import StructuredRequest
 from prism.structured.response import StructuredResponse
+from prism.structured.step import StructuredStep
 
 __all__ = [
     "StructuredPendingRequest",
     "StructuredRequest",
     "StructuredResponse",
+    "StructuredStep",
     "extract_structured",
 ]

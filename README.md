@@ -56,6 +56,14 @@ calls is refused with `tool_loop_not_supported` rather than half-executed — an
 the fifteen providers the reference has and this one does not. An unsupported
 capability raises a coded error rather than a missing attribute.
 
+Structured responses retain `structured`, `steps`, `raw`, and the tool carrier
+tuples when serialized with `to_dict()`. Each `StructuredStep`, exported from
+`prism.structured`, retains its completed `messages` and per-step parsed value.
+Preserve that conversation state when continuing a conversation. Anthropic uses
+native schema output by default: `text` is empty while the original JSON remains
+in the assistant message. Explicit structured tool mode raises
+`unsupported_provider_action` before HTTP; it does not run tools.
+
 Not every capability reaches every provider, because not every provider has one.
 `images`, `moderation`, `text_to_speech`, `files` and `batch` are OpenAI-only
 here, and `fim` is Mistral-only because Mistral is the only provider that

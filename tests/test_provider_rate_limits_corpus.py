@@ -10,14 +10,15 @@ has lifted.
 This suite was written while closing G-15 -- this port had no rate-limit reader
 at all -- and its first run found that the two REFERENCES disagree with each
 other on nine of sixteen rows, which the register had not predicted. Ten rows
-disagreed in total; SEVEN do now. They are recorded rather than reconciled, and
+disagreed in total; SIX do now. They are recorded rather than reconciled, and
 pinned here so that closing any of them is a deliberate act.
 
-Three closed, and this column moved for none of them: prism-ts learned the names
+Four closed, and this column moved for none of them: prism-ts learned the names
 Mistral actually sends (G-41), and both references learned to compare a field
 name case-insensitively (G-43, prl-0008) and to keep a response whose reset
 header it cannot read (G-43, prl-0006). This port had all three from the start,
-which is what decision 0002 buys.
+which is what decision 0002 buys. Published PHP 0.144.2 also closes prl-0015:
+absent Mistral quota headers produce no bucket in any language.
 
 Mirrors prism-ts/tests/rate-limits-corpus.test.ts case for case.
 """
@@ -87,9 +88,17 @@ def test_the_rows_that_disagree_are_the_ones_the_corpus_says_disagree() -> None:
         "prl-0003",
         "prl-0004",
         "prl-0005",
-        "prl-0015",
         "prl-0016",
     ]
+
+
+def test_absent_mistral_quota_headers_agree_on_no_bucket() -> None:
+    case = next(entry for entry in CASES if entry["id"] == "prl-0015")
+    empty: dict[str, Any] = {"outcome": "ok", "buckets": []}
+    assert case["agrees"] is True
+    assert _read(case) == empty
+    for language in ("php", "ts", "py"):
+        assert case["result"][language] == empty
 
 
 def test_follows_the_reference_where_the_reference_is_right() -> None:
@@ -119,13 +128,11 @@ def test_the_mistral_names_that_prism_ts_used_to_miss_now_agree_in_three() -> No
 
 def test_diverges_from_the_reference_only_where_the_reference_is_wrong() -> None:
     # Decision 0002: the port contract is the golden, not the defect. Four rows
-    # started here; TWO remain, because on the other two the REFERENCE was
+    # started here; ONE remains, because on the other three the REFERENCE was
     # brought to this port rather than the other way round.
     #
     #   prl-0005  the reference keeps the wire offset, so one instant stores as
     #             two different strings depending on who wrote the record
-    #   prl-0015  the reference invents an exhausted bucket out of headers that
-    #             were never sent
     #
     # Closed in the reference, 2026-09-05 (G-43):
     #
@@ -133,7 +140,10 @@ def test_diverges_from_the_reference_only_where_the_reference_is_wrong() -> None
     #             header aborted an already-paid-for completion
     #   prl-0008  the reference matched its prefix case-sensitively, so a
     #             title-casing proxy silently erased every rate limit
-    divergent = {"prl-0005", "prl-0015"}
+    # Closed in published PHP 0.144.2: prl-0015 no longer invents an exhausted
+    # bucket from quota headers that were never sent. The explicit empty-bucket
+    # agreement test above guards that closure.
+    divergent = {"prl-0005"}
 
     for case in CASES:
         agrees_with_reference = case["result"]["py"] == case["result"]["php"]
