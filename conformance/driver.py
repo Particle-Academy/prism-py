@@ -112,6 +112,32 @@ def hydrate(value: Any) -> Any:
     if tag == "Tool":
         return _tool(value)
 
+    if tag == "UsageAggregate":
+        from prism.enums import FinishReason
+        from prism.text.response_builder import ResponseBuilder
+        from prism.text.step import Step
+
+        def conserved(usage: Usage) -> None:
+            if (
+                usage.cache_write_5m_input_tokens is not None
+                and usage.cache_write_1h_input_tokens is not None
+                and usage.cache_write_input_tokens
+                != usage.cache_write_5m_input_tokens + usage.cache_write_1h_input_tokens
+            ):
+                raise DriverError("Reported cache-write total disagrees with lifetime split.")
+
+        builder = ResponseBuilder()
+        for subject in value["steps"]:
+            usage = hydrate(subject)
+            conserved(usage)
+            builder.add_step(Step(text="{}", finish_reason=FinishReason.STOP, usage=usage))
+        aggregate = builder.to_response().usage
+        conserved(aggregate)
+        for key, expected in value["expected"].items():
+            if aggregate.to_dict()[key] != expected:
+                raise DriverError(f"Independent cache-write aggregate failed: {key}")
+        return aggregate
+
     if tag == "StringSchema":
         return StringSchema(value["name"], value["description"])
 
@@ -131,7 +157,17 @@ def hydrate(value: Any) -> Any:
     if factory is None:
         raise DriverError(f"Unknown construct {tag!r}.")
 
-    return factory(**{_snake(key): hydrate(item) for key, item in value.items() if key != "$"})
+    names = (
+        {
+            "cacheWrite5mInputTokens": "cache_write_5m_input_tokens",
+            "cacheWrite1hInputTokens": "cache_write_1h_input_tokens",
+        }
+        if tag == "Usage"
+        else {}
+    )
+    return factory(
+        **{names.get(key, _snake(key)): hydrate(item) for key, item in value.items() if key != "$"}
+    )
 
 
 _MEDIA: dict[str, type[Any]] = {

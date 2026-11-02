@@ -68,6 +68,16 @@ class ResponseBuilder:
                 return None
             return sum(value or 0 for value in values)
 
+        def cache_writes(attribute: str) -> int | None:
+            if all(usage.cache_write_input_tokens is None for usage in usages):
+                return None
+            if any(
+                (usage.cache_write_input_tokens or 0) != 0 and getattr(usage, attribute) is None
+                for usage in usages
+            ):
+                return None
+            return sum(getattr(usage, attribute) or 0 for usage in usages)
+
         costs = [usage.cost for usage in usages]
 
         return Usage(
@@ -75,6 +85,8 @@ class ResponseBuilder:
             completion_tokens=sum(usage.completion_tokens for usage in usages),
             cache_write_input_tokens=total("cache_write_input_tokens"),
             cache_read_input_tokens=total("cache_read_input_tokens"),
+            cache_write_5m_input_tokens=cache_writes("cache_write_5m_input_tokens"),
+            cache_write_1h_input_tokens=cache_writes("cache_write_1h_input_tokens"),
             thought_tokens=total("thought_tokens"),
             cost=None
             if all(cost is None for cost in costs)

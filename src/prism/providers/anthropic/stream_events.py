@@ -127,6 +127,12 @@ class AnthropicStreamMapper:
                 cache_write_input_tokens=usage.get("cache_creation_input_tokens"),
                 cache_read_input_tokens=usage.get("cache_read_input_tokens"),
                 thought_tokens=data_get(usage, "output_tokens_details.thinking_tokens"),
+                cache_write_5m_input_tokens=data_get(
+                    usage, "cache_creation.ephemeral_5m_input_tokens"
+                ),
+                cache_write_1h_input_tokens=data_get(
+                    usage, "cache_creation.ephemeral_1h_input_tokens"
+                ),
             )
 
         return StreamStartEvent(model=_str(data_get(payload, "message.model")))
@@ -197,27 +203,48 @@ class AnthropicStreamMapper:
         usage = payload.get("usage")
 
         if isinstance(usage, dict):
-            # Rebuilt rather than mutated, so anything not restated here would
-            # be LOST. Prompt tokens were already carried forward for exactly
-            # that reason; cache and thinking counts arrive at message_start and
-            # never again, so they need the same carry.
+            # Restated counters replace cumulative values; sparse deltas retain
+            # earlier reports, including cache lifetimes from message_start.
             if isinstance(usage.get("output_tokens"), int):
                 self._final_usage_reported = True
             carried = self._usage
-            thinking = data_get(usage, "output_tokens_details.thinking_tokens")
+
+            def counter(key: str, previous: int | None) -> int | None:
+                value = data_get(usage, key)
+                return previous if value is None else _int(value)
+
+            cache_write_total = counter(
+                "cache_creation_input_tokens", carried.cache_write_input_tokens if carried else None
+            )
+            cache_write_report = (
+                carried
+                if carried is not None and cache_write_total == carried.cache_write_input_tokens
+                else None
+            )
 
             self._usage = Usage(
-                prompt_tokens=carried.prompt_tokens if carried else 0,
-                completion_tokens=_int(usage.get("output_tokens")),
-                cache_write_input_tokens=carried.cache_write_input_tokens if carried else None,
-                cache_read_input_tokens=carried.cache_read_input_tokens if carried else None,
-                # `if thinking is None` rather than `or`: Python's `or` treats 0
-                # as absent, so a model that reported ZERO thinking tokens would
-                # silently inherit the previous count. PHP's `??` and the TS
-                # `??` both keep the zero, and this has to agree with them.
-                thought_tokens=(carried.thought_tokens if carried else None)
-                if thinking is None
-                else thinking,
+                prompt_tokens=counter("input_tokens", carried.prompt_tokens if carried else 0) or 0,
+                completion_tokens=counter(
+                    "output_tokens", carried.completion_tokens if carried else 0
+                )
+                or 0,
+                cache_write_input_tokens=cache_write_total,
+                cache_read_input_tokens=counter(
+                    "cache_read_input_tokens", carried.cache_read_input_tokens if carried else None
+                ),
+                thought_tokens=counter(
+                    "output_tokens_details.thinking_tokens",
+                    carried.thought_tokens if carried else None,
+                ),
+                cost=carried.cost if carried else None,
+                cache_write_5m_input_tokens=counter(
+                    "cache_creation.ephemeral_5m_input_tokens",
+                    cache_write_report.cache_write_5m_input_tokens if cache_write_report else None,
+                ),
+                cache_write_1h_input_tokens=counter(
+                    "cache_creation.ephemeral_1h_input_tokens",
+                    cache_write_report.cache_write_1h_input_tokens if cache_write_report else None,
+                ),
             )
 
     def _finish_reason(self) -> FinishReason:
