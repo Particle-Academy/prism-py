@@ -154,7 +154,8 @@ def test_usage_with_every_optional_field_unset_roundtrips() -> None:
     assert_roundtrips(
         Usage(11, 56),
         '{"prompt_tokens":11,"completion_tokens":56,"cache_write_input_tokens":null,'
-        '"cache_read_input_tokens":null,"thought_tokens":null,"cost":null}',
+        '"cache_read_input_tokens":null,"thought_tokens":null,"cost":null,'
+        '"cache_write_5m_input_tokens":null,"cache_write_1h_input_tokens":null}',
     )
 
 
@@ -162,7 +163,8 @@ def test_usage_with_every_optional_field_set_roundtrips() -> None:
     assert_roundtrips(
         Usage(128, 12, 64, 896, 4, 0.00125),
         '{"prompt_tokens":128,"completion_tokens":12,"cache_write_input_tokens":64,'
-        '"cache_read_input_tokens":896,"thought_tokens":4,"cost":0.00125}',
+        '"cache_read_input_tokens":896,"thought_tokens":4,"cost":0.00125,'
+        '"cache_write_5m_input_tokens":null,"cache_write_1h_input_tokens":null}',
     )
 
 

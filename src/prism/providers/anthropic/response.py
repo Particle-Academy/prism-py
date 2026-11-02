@@ -171,4 +171,12 @@ def _build_usage(data: Mapping[str, Any]) -> Usage:
         # API; this was hardcoded to None, and the other two languages simply
         # never set it -- so all three agreed, and agreement is not correctness.
         thought_tokens=data_get(data, "usage.output_tokens_details.thinking_tokens"),
+        cache_write_5m_input_tokens=data_get(
+            data,
+            "usage.cache_creation.ephemeral_5m_input_tokens",
+        ),
+        cache_write_1h_input_tokens=data_get(
+            data,
+            "usage.cache_creation.ephemeral_1h_input_tokens",
+        ),
     )

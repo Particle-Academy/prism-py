@@ -25,6 +25,10 @@ class Usage:
     cache_read_input_tokens: int | None = None
     thought_tokens: int | None = None
     cost: float | None = None
+    # Five-minute cache writes; Anthropic bills 1.25x the base input price.
+    cache_write_5m_input_tokens: int | None = None
+    # One-hour cache writes; Anthropic bills 2x the base input price.
+    cache_write_1h_input_tokens: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -34,6 +38,8 @@ class Usage:
             "cache_read_input_tokens": self.cache_read_input_tokens,
             "thought_tokens": self.thought_tokens,
             "cost": self.cost,
+            "cache_write_5m_input_tokens": self.cache_write_5m_input_tokens,
+            "cache_write_1h_input_tokens": self.cache_write_1h_input_tokens,
         }
 
     @classmethod
@@ -45,4 +51,6 @@ class Usage:
             cache_read_input_tokens=data.get("cache_read_input_tokens"),
             thought_tokens=data.get("thought_tokens"),
             cost=data.get("cost"),
+            cache_write_5m_input_tokens=data.get("cache_write_5m_input_tokens"),
+            cache_write_1h_input_tokens=data.get("cache_write_1h_input_tokens"),
         )
