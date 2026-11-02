@@ -127,11 +127,20 @@ jobs:
       # imports the loader — so the corpus has to be here. Exempting the runner
       # from type checking instead would exempt exactly the code most likely to
       # rot when the corpus moves.
+      - name: Read pinned parity revision
+        id: parity
+        env:
+          NODE_OPTIONS: ''
+          NODE_PATH: ''
+        run: node .github/scripts/parity-pin.mjs
+
       - name: Checkout prism-parity
         uses: actions/checkout@v4
         with:
           repository: Particle-Academy/prism-parity
+          ref: ${{ steps.parity.outputs.sha }}
           path: .parity
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

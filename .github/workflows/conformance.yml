@@ -30,11 +30,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read pinned parity revision
+        id: parity
+        env:
+          NODE_OPTIONS: ''
+          NODE_PATH: ''
+        run: node .github/scripts/parity-pin.mjs
+
       - name: Checkout prism-parity
         uses: actions/checkout@v4
         with:
           repository: Particle-Academy/prism-parity
+          ref: ${{ steps.parity.outputs.sha }}
           path: .parity
+          persist-credentials: false
 
       # BEFORE the install, and in this file rather than only in tests.yml. pip
       # runs a package's build backend to install it, so an unapproved or
