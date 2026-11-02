@@ -13,10 +13,7 @@ on:
       - main
       - "*.x"
   pull_request:
-  # The corpus moves on its own schedule. A port that was conformant on Monday
-  # can be behind on Tuesday without anything in this repository changing.
-  schedule:
-    - cron: "30 7 * * *"
+  # Nightly main drift is measured separately by parity-drift.yml.
 
 permissions:
   contents: read
@@ -33,6 +30,7 @@ jobs:
       - name: Read pinned parity revision
         id: parity
         env:
+          GH_TOKEN: ${{ github.token }}
           NODE_OPTIONS: ''
           NODE_PATH: ''
         run: node .github/scripts/parity-pin.mjs

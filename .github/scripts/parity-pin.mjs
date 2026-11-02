@@ -27,20 +27,27 @@ export function assertMerged(sha, comparison) {
   }
 }
 
+function github(endpoint) {
+  try {
+    return JSON.parse(execFileSync('gh', ['api', '--method', 'GET', '-H', 'Cache-Control: no-cache', `repos/Particle-Academy/prism-parity/${endpoint}`], { encoding: 'utf8', timeout: 60_000, maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }));
+  } catch {
+    throw new Error('Could not verify the pinned parity revision through GitHub; refusing to continue.');
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args.length > 1 || (args.length === 1 && args[0] !== '--release')) throw new Error('Usage: parity-pin.mjs [--release]');
   const sha = readPin();
   if (args[0] === '--release') {
-    let comparison;
-    try {
-      comparison = JSON.parse(execFileSync('gh', ['api', '--method', 'GET', '-H', 'Cache-Control: no-cache', `repos/Particle-Academy/prism-parity/compare/${sha}...main`], { encoding: 'utf8', timeout: 60_000, maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }));
-    } catch {
-      throw new Error('Could not verify the pinned parity revision against prism-parity main; refusing to publish.');
-    }
-    assertMerged(sha, comparison);
+    assertMerged(sha, github(`compare/${sha}...main`));
     console.log(`Pinned corpus ${sha} is merged into prism-parity main.`);
   } else {
+    const branches = github(`commits/${sha}/branches-where-head`);
+    if (!Array.isArray(branches)) throw new Error('Could not verify the pinned parity branch provenance; refusing to continue.');
+    if (!branches.some(branch => branch?.commit?.sha === sha)) {
+      assertMerged(sha, github(`compare/${sha}...main`));
+    }
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `sha=${sha}\n`);
     console.log(sha);
   }

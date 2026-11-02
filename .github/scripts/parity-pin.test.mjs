@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import process from 'node:process';
-import { URL } from 'node:url';
+import { URL, pathToFileURL } from 'node:url';
 import { readPin, assertMerged } from './parity-pin.mjs';
 
 const sha = '0123456789abcdef0123456789abcdef01234567';
@@ -64,6 +64,26 @@ test('valid CLI output contains exactly the validated commit', (t) => {
   mkdirSync(scripts, { recursive: true }); mkdirSync(join(root, 'conformance'));
   copyFileSync(new URL('./parity-pin.mjs', import.meta.url), join(scripts, 'parity-pin.mjs'));
   writeFileSync(join(root, 'conformance/parity.lock'), sha + '\n');
-  const result = spawnSync(process.execPath, [join(scripts, 'parity-pin.mjs')], { cwd: resolve(tmpdir()), env: { ...process.env, GITHUB_OUTPUT: output, NODE_OPTIONS: '', NODE_PATH: '' }, encoding: 'utf8', timeout: 10_000 });
+  const mock = join(root, 'mock.mjs');
+  writeFileSync(mock, `import cp from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+cp.execFileSync = (file, args) => {
+  if (file !== 'gh' || args.at(-1) !== 'repos/Particle-Academy/prism-parity/commits/${sha}/branches-where-head') throw new Error('Wrong API subject');
+  return JSON.stringify([{ name: 'owned', commit: { sha: '${sha}' } }]);
+};
+syncBuiltinESMExports();
+`);
+  const result = spawnSync(process.execPath, ['--import', pathToFileURL(mock).href, join(scripts, 'parity-pin.mjs')], { cwd: resolve(tmpdir()), env: { ...process.env, GITHUB_OUTPUT: output, NODE_OPTIONS: '', NODE_PATH: '' }, encoding: 'utf8', timeout: 10_000 });
   assert.equal(result.status, 0, result.stderr); assert.equal(result.stdout, sha + '\n'); assert.equal(readFileSync(output, 'utf8'), 'sha=' + sha + '\n');
+});
+
+test('scheduled conformance uses merged main through the separate drift workflow', () => {
+  const pinned = readFileSync(new URL('../workflows/conformance.yml', import.meta.url), 'utf8');
+  const drift = readFileSync(new URL('../workflows/parity-drift.yml', import.meta.url), 'utf8');
+  assert.doesNotMatch(pinned, /^ {2}(schedule|workflow_dispatch):/m);
+  assert.match(pinned, /^ {2}pull_request:/m);
+  assert.match(drift, /^ {2}schedule:/m);
+  assert.match(drift, /^ {2}workflow_dispatch:/m);
+  assert.doesNotMatch(drift, /^ {2}pull_request:/m);
+  assert.match(drift, /^ {10}ref: main$/m);
 });

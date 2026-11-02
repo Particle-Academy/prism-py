@@ -31,11 +31,12 @@ jobs:
       # absent — is the failure this whole project is about: a mechanism that is
       # correct and silently not running, reporting green.
       - name: Test parity pin guards
-        run: node --test .github/scripts/parity-pin.test.mjs
+        run: node --test .github/scripts/parity-pin.test.mjs .github/scripts/parity-provenance.test.mjs
 
       - name: Read pinned parity revision
         id: parity
         env:
+          GH_TOKEN: ${{ github.token }}
           NODE_OPTIONS: ''
           NODE_PATH: ''
         run: node .github/scripts/parity-pin.mjs

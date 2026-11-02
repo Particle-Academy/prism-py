@@ -38,6 +38,7 @@ jobs:
       - name: Read pinned parity revision
         id: parity
         env:
+          GH_TOKEN: ${{ github.token }}
           NODE_OPTIONS: ''
           NODE_PATH: ''
         run: node .github/scripts/parity-pin.mjs
