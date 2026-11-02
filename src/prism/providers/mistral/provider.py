@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Iterator
+from contextlib import closing
 from typing import Any
 
 from prism import canonical
@@ -37,8 +38,8 @@ from prism.providers.mistral.request_body import (
 from prism.providers.mistral.response import parse_text_response
 from prism.providers.mistral.stream_events import MistralStreamMapper
 from prism.providers.openai.audio import build_transcription_form, parse_transcription_response
-from prism.streaming.events import StreamEvent
-from prism.streaming.sse import sse_data
+from prism.streaming.events import ErrorEvent, StreamEvent
+from prism.streaming.failure_usage import failure_aware_sse
 from prism.structured.from_text import structured_from_text_response
 from prism.structured.request import StructuredRequest
 from prism.structured.response import StructuredResponse
@@ -187,13 +188,21 @@ class Mistral(Provider):
         """
         mapper = MistralStreamMapper()
 
-        for payload in sse_data(chunks):
-            # Mistral closes with a literal `[DONE]`, which is not JSON. Parsing
-            # it yields an empty dict, which the mapper would read as a chunk.
-            if payload == "[DONE]":
-                return
+        with closing(failure_aware_sse(chunks, mapper.failure_usage)) as payloads:
+            for payload in payloads:
+                if isinstance(payload, ErrorEvent):
+                    yield payload
+                    continue
+                # Mistral closes with a literal `[DONE]`, which is not JSON. Parsing
+                # it yields an empty dict, which the mapper would read as a chunk.
+                if payload == "[DONE]":
+                    return
 
-            yield from mapper.map(_loads(payload))
+                parsed = _stream_loads(payload)
+                if parsed is None:
+                    yield mapper.decode_failure()
+                    break
+                yield from mapper.map(parsed)
 
     # -- internals ---------------------------------------------------------
 
@@ -277,10 +286,14 @@ class Mistral(Provider):
 
 
 def _loads(text: str) -> dict[str, Any]:
-    """An SSE payload that is not JSON is skipped rather than fatal."""
+    return _stream_loads(text) or {}
+
+
+def _stream_loads(text: str) -> dict[str, Any] | None:
+    """Distinguish malformed JSON from an unknown, valid payload."""
     try:
         parsed = json.loads(text)
     except ValueError:
-        return {}
+        return None
 
     return parsed if isinstance(parsed, dict) else {}

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Iterator
+from contextlib import closing
 from typing import Any
 
 from prism import canonical
@@ -23,8 +24,8 @@ from prism.providers.anthropic.request_body import build_request_body, build_str
 from prism.providers.anthropic.response import parse_text_response
 from prism.providers.anthropic.stream_events import AnthropicStreamMapper
 from prism.providers.base import Provider
-from prism.streaming.events import StreamEvent
-from prism.streaming.sse import sse_data
+from prism.streaming.events import ErrorEvent, StreamEvent
+from prism.streaming.failure_usage import failure_aware_sse
 from prism.structured.from_text import structured_from_text_response
 from prism.structured.request import StructuredRequest
 from prism.structured.response import StructuredResponse
@@ -143,11 +144,19 @@ class Anthropic(Provider):
     def _events(self, chunks: Iterator[str]) -> Iterator[StreamEvent]:
         mapper = AnthropicStreamMapper()
 
-        for payload in sse_data(chunks):
-            event = mapper.map(_loads(payload))
+        with closing(failure_aware_sse(chunks, mapper.failure_usage)) as payloads:
+            for payload in payloads:
+                if isinstance(payload, ErrorEvent):
+                    yield payload
+                    continue
+                parsed = _stream_loads(payload)
+                if parsed is None:
+                    yield mapper.decode_failure()
+                    break
+                event = mapper.map(parsed)
 
-            if event is not None:
-                yield event
+                if event is not None:
+                    yield event
 
         yield from mapper.finish()
 
@@ -195,10 +204,14 @@ class Anthropic(Provider):
 
 
 def _loads(text: str) -> dict[str, Any]:
-    """An SSE payload that is not JSON is skipped rather than fatal."""
+    return _stream_loads(text) or {}
+
+
+def _stream_loads(text: str) -> dict[str, Any] | None:
+    """Distinguish malformed JSON from an unknown, valid payload."""
     try:
         parsed = json.loads(text)
     except ValueError:
-        return {}
+        return None
 
     return parsed if isinstance(parsed, dict) else {}

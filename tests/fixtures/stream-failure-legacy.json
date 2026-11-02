@@ -1,0 +1,23 @@
+{
+  "error_event_object": {
+    "id": "owned-event",
+    "timestamp": 0,
+    "type": "error",
+    "code": "owned_code",
+    "message": "owned-message",
+    "recoverable": false
+  },
+  "error_event_json": "{\"id\": \"owned-event\", \"timestamp\": 0, \"type\": \"error\", \"code\": \"owned_code\", \"message\": \"owned-message\", \"recoverable\": false}",
+  "sdk_error_fields": {
+    "class_name": "PrismError",
+    "code": "provider_response_error",
+    "message": "owned-message",
+    "status": 429,
+    "body": "owned-body",
+    "args": [
+      "owned-message"
+    ],
+    "representation": "PrismError(code='provider_response_error', message='owned-message')"
+  },
+  "cause_preserved": true
+}

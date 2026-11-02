@@ -21,6 +21,7 @@ from prism.value_objects.meta import Meta
 from prism.value_objects.provider_rate_limit import ProviderRateLimit
 from prism.value_objects.provider_tool import ProviderTool
 from prism.value_objects.provider_tool_call import ProviderToolCall
+from prism.value_objects.stream_failure_usage import StreamFailureUsage
 from prism.value_objects.tool_call import ToolCall
 from prism.value_objects.tool_result import ToolResult
 from prism.value_objects.usage import Usage
@@ -33,6 +34,7 @@ __all__ = [
     "ProviderRateLimit",
     "ProviderTool",
     "ProviderToolCall",
+    "StreamFailureUsage",
     "SystemMessage",
     "Text",
     "ToolCall",

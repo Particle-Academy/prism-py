@@ -5,6 +5,21 @@ A unified API layer over LLM providers — the Python port of
 
 Zero runtime dependencies. Python 3.10+.
 
+Anthropic, OpenAI and Mistral streams retain reported usage on failure through
+immutable `StreamFailureUsage` snapshots. Read `ErrorEvent.failure_usage`, or
+`PrismError.stream_failure_usage()` on an SDK-owned read exception. The full
+`usage` and `reported_fields` mask preserve the difference between a reported
+zero and an unknown counter. Snapshots are provisional, cover only the failed
+attempt and exclude completed steps. Serialization omits `failure_usage` when
+no counter was reported.
+
+Recognized malformed stream JSON now emits one `stream_decode_error`, even
+without usage. Anthropic then ends with Error; OpenAI and Mistral emit no
+fabricated terminal event. A foreign transport failure with reported usage
+emits one error event before rethrowing the original exception. Existing
+successful accounting and exception identity/cause stay intact. Native
+multi-step stream/tool continuation remains unsupported.
+
 ```python
 from prism import Prism
 

@@ -9,7 +9,10 @@ change.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from prism.value_objects.stream_failure_usage import StreamFailureUsage
 
 __all__ = ["ErrorCode", "PrismError"]
 
@@ -65,6 +68,26 @@ class PrismError(Exception):
         self.message = message
         self.status = status
         self.body = body
+        self._stream_failure_usage: StreamFailureUsage | None = None
+
+    def stream_failure_usage(self) -> StreamFailureUsage | None:
+        return self._stream_failure_usage
+
+    def with_stream_failure_usage(self, failure_usage: StreamFailureUsage | None) -> PrismError:
+        self._stream_failure_usage = failure_usage
+        return self
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serializable SDK metadata excludes message, body and arbitrary exception internals."""
+        return {
+            "code": self.code,
+            "status": self.status,
+            **(
+                {}
+                if self._stream_failure_usage is None
+                else {"failure_usage": self._stream_failure_usage.to_dict()}
+            ),
+        }
 
     def __repr__(self) -> str:
         return f"PrismError(code={self.code!r}, message={self.message!r})"
