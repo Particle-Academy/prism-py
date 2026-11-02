@@ -89,3 +89,17 @@ test('canonical execution jobs have no dependency cache and every pin read is au
   }
   assert.equal(checked, 5);
 });
+
+
+test('project pin helpers run only after the verified dependency policy gate', () => {
+  const conformance = readFileSync(new URL('../workflows/conformance.yml', import.meta.url), 'utf8');
+  const publish = readFileSync(new URL('../workflows/publish.yml', import.meta.url), 'utf8');
+  const gate = text => text.indexOf('- name: Third-party dependency allowlist');
+  assert(gate(conformance) >= 0 && gate(publish) >= 0);
+  assert.doesNotMatch(conformance.slice(0, gate(conformance)), /run:\s*node\s+(?!-e\b)/);
+  assert.doesNotMatch(publish.slice(0, gate(publish)), /run:\s*node\s+(?!-e\b)/);
+  assert(conformance.indexOf('- name: Read pinned parity revision') > gate(conformance));
+  assert(conformance.indexOf('- name: Checkout prism-parity') > conformance.indexOf('- name: Read pinned parity revision'));
+  assert(publish.indexOf('- name: Pinned corpus must be merged') > gate(publish));
+  assert(publish.indexOf('run: node .github/scripts/parity-pin.mjs --release') < publish.indexOf('\n  publish:'));
+});

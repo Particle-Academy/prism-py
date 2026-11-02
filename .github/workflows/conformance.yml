@@ -27,28 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read pinned parity revision
-        id: parity
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NODE_OPTIONS: ''
-          NODE_PATH: ''
-        run: node .github/scripts/parity-pin.mjs
-
-      - name: Checkout prism-parity
-        uses: actions/checkout@v4
-        with:
-          repository: Particle-Academy/prism-parity
-          ref: ${{ steps.parity.outputs.sha }}
-          path: .parity
-          persist-credentials: false
-
-      # BEFORE the install, and in this file rather than only in tests.yml. pip
-      # runs a package's build backend to install it, so an unapproved or
-      # unmaintained dependency executes code on this runner the moment it is
-      # fetched — a check that runs alongside the install reports on something
-      # that has already happened. The list is fetched, never vendored, so there
-      # is no copy here to drift.
       - name: Fetch the third-party allowlist
         uses: actions/checkout@v4
         with:
@@ -120,6 +98,28 @@ jobs:
           node .third-party-allowlist/third-party/check.mjs --repo .
           node -e "require('node:fs').rmSync('.third-party-allowlist',{recursive:true,force:true})"
 
+      - name: Read pinned parity revision
+        id: parity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NODE_OPTIONS: ''
+          NODE_PATH: ''
+        run: node .github/scripts/parity-pin.mjs
+
+      - name: Checkout prism-parity
+        uses: actions/checkout@v4
+        with:
+          repository: Particle-Academy/prism-parity
+          ref: ${{ steps.parity.outputs.sha }}
+          path: .parity
+          persist-credentials: false
+
+      # BEFORE the install, and in this file rather than only in tests.yml. pip
+      # runs a package's build backend to install it, so an unapproved or
+      # unmaintained dependency executes code on this runner the moment it is
+      # fetched — a check that runs alongside the install reports on something
+      # that has already happened. The list is fetched, never vendored, so there
+      # is no copy here to drift.
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

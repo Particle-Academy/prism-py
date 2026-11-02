@@ -29,16 +29,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Pinned corpus must be merged
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NODE_OPTIONS: ''
-          NODE_PATH: ''
-        run: node .github/scripts/parity-pin.mjs --release
-
-      # Run again at publish time, not only when the commit landed: a dependency
-      # that has since gone unmaintained, or an approval since withdrawn from the
-      # allowlist, should stop the release.
       - name: Fetch the third-party allowlist
         uses: actions/checkout@v4
         with:
@@ -110,6 +100,16 @@ jobs:
           node .third-party-allowlist/third-party/check.mjs --repo .
           node -e "require('node:fs').rmSync('.third-party-allowlist',{recursive:true,force:true})"
 
+      - name: Pinned corpus must be merged
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NODE_OPTIONS: ''
+          NODE_PATH: ''
+        run: node .github/scripts/parity-pin.mjs --release
+
+      # Run again at publish time, not only when the commit landed: a dependency
+      # that has since gone unmaintained, or an approval since withdrawn from the
+      # allowlist, should stop the release.
       - uses: actions/setup-python@v5
         with:
           # tomllib is stdlib from 3.11. The package floor is 3.10, but this job
