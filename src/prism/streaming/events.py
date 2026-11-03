@@ -9,6 +9,7 @@ from itertools import count
 from typing import Any
 
 from prism.enums import FinishReason
+from prism.value_objects.stream_failure_usage import StreamFailureUsage
 from prism.value_objects.tool_call import ToolCall
 from prism.value_objects.usage import Usage
 
@@ -144,6 +145,7 @@ class ErrorEvent(StreamEvent):
     code: str = "unknown_error"
     message: str = ""
     recoverable: bool | None = None
+    failure_usage: StreamFailureUsage | None = None
 
     def type(self) -> StreamEventType:
         return StreamEventType.ERROR
@@ -154,6 +156,11 @@ class ErrorEvent(StreamEvent):
             "code": self.code,
             "message": self.message,
             **({} if self.recoverable is None else {"recoverable": self.recoverable}),
+            **(
+                {}
+                if self.failure_usage is None
+                else {"failure_usage": self.failure_usage.to_dict()}
+            ),
         }
 
 

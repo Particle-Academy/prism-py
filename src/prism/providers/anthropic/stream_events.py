@@ -18,6 +18,8 @@ from prism.streaming.events import (
     TextStartEvent,
     ToolCallEvent,
 )
+from prism.streaming.failure_usage import StreamFailureUsageTracker
+from prism.value_objects.stream_failure_usage import StreamFailureUsage
 from prism.value_objects.tool_call import ToolCall
 from prism.value_objects.usage import Usage
 
@@ -57,8 +59,10 @@ class AnthropicStreamMapper:
         self._failed = False
         self._finished = False
         self._final_usage_reported = False
+        self._failure = StreamFailureUsageTracker("anthropic")
 
     def map(self, payload: dict[str, Any]) -> StreamEvent | None:
+        self._failure.record(payload)
         kind = _str(payload.get("type"))
 
         if kind == "message_start":
@@ -82,6 +86,7 @@ class AnthropicStreamMapper:
                 message=_str(data_get(payload, "error.message"))
                 or "The provider reported an error mid-stream.",
                 recoverable=False,
+                failure_usage=self.failure_usage(),
             )
 
         # `ping`, and anything Anthropic adds later. Ignored rather than fatal,
@@ -102,6 +107,7 @@ class AnthropicStreamMapper:
                     code="incomplete_stream",
                     message="The stream ended before Anthropic finished the message.",
                     recoverable=False,
+                    failure_usage=self.failure_usage(),
                 )
             )
         for block in self._blocks.values():
@@ -115,6 +121,18 @@ class AnthropicStreamMapper:
             )
         )
         return events
+
+    def failure_usage(self) -> StreamFailureUsage | None:
+        return self._failure.snapshot()
+
+    def decode_failure(self) -> ErrorEvent:
+        self._failed = True
+        return ErrorEvent(
+            code="stream_decode_error",
+            message="The stream contained invalid JSON.",
+            recoverable=False,
+            failure_usage=self.failure_usage(),
+        )
 
     def _message_start(self, payload: dict[str, Any]) -> StreamEvent:
         self._message_id = _str(data_get(payload, "message.id"))

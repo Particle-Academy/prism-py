@@ -6,6 +6,7 @@ import base64
 from typing import Any
 from unittest.mock import patch
 
+from conformance.failure_usage_py import failure_usage_violations, parse_failure_stream
 from prism import Prism
 from prism.providers.anthropic import Anthropic
 
@@ -31,6 +32,8 @@ class ChunkResponse:
 
 
 def parse_stream(case: dict[str, Any]) -> dict[str, Any]:
+    if case.get("properties", {}).get("contract") == "failure-usage":
+        return parse_failure_stream(case)
     stream = case["stream"]
     if stream.get("encoding") != "base64" or not stream.get("chunks"):
         raise ValueError("A stream fixture needs nonempty base64 chunks.")
@@ -89,6 +92,8 @@ def alias_opaque(value: Any, aliases: dict[str, str]) -> Any:
 
 
 def violations(trace: dict[str, Any], properties: dict[str, Any]) -> list[str]:
+    if properties.get("contract") == "failure-usage":
+        return failure_usage_violations(trace, properties)
     failed = []
     events = trace["events"]
     ends = [event for event in events if event["type"] == "stream_end"]

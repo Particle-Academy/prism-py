@@ -16,13 +16,16 @@ from prism.streaming.events import (
     TextStartEvent,
     ToolCallEvent,
 )
+from prism.value_objects.stream_failure_usage import StreamFailureUsage
 from prism.value_objects.tool_call import ToolCall
 from prism.value_objects.usage import Usage
 
 __all__ = ["map_stream_event"]
 
 
-def map_stream_event(payload: dict[str, Any]) -> StreamEvent | None:
+def map_stream_event(
+    payload: dict[str, Any], failure_usage: StreamFailureUsage | None = None
+) -> StreamEvent | None:
     """Return the event this payload means, or ``None``.
 
     RETURNS NONE FOR ANYTHING IT DOES NOT RECOGNISE, on purpose. OpenAI adds
@@ -61,6 +64,7 @@ def map_stream_event(payload: dict[str, Any]) -> StreamEvent | None:
             code=_str(data_get(payload, "error.code")) or "unknown_error",
             message=_str(data_get(payload, "error.message"))
             or "The provider reported an error mid-stream.",
+            failure_usage=failure_usage,
         )
 
     if kind in ("response.completed", "response.incomplete"):

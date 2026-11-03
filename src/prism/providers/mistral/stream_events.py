@@ -6,6 +6,7 @@ from typing import Any
 
 from prism.enums import FinishReason
 from prism.streaming.events import (
+    ErrorEvent,
     StreamEndEvent,
     StreamEvent,
     StreamStartEvent,
@@ -14,7 +15,9 @@ from prism.streaming.events import (
     TextStartEvent,
     ToolCallEvent,
 )
+from prism.streaming.failure_usage import StreamFailureUsageTracker
 from prism.value_objects import ToolCall
+from prism.value_objects.stream_failure_usage import StreamFailureUsage
 from prism.value_objects.usage import Usage
 
 __all__ = ["MistralStreamMapper"]
@@ -51,6 +54,7 @@ class MistralStreamMapper:
         self._text = ""
         self._usage: Usage | None = None
         self._tool_calls: dict[int, dict[str, str]] = {}
+        self._failure = StreamFailureUsageTracker("mistral")
 
     def map(self, payload: dict[str, Any]) -> list[StreamEvent]:
         """The events for one chunk -- zero, one, or SEVERAL.
@@ -60,6 +64,7 @@ class MistralStreamMapper:
         can complete the text, flush a tool call and end the stream at once.
         Returning only the first would drop the rest silently.
         """
+        self._failure.record(payload)
         events: list[StreamEvent] = []
 
         if not self._started:
@@ -129,6 +134,17 @@ class MistralStreamMapper:
             )
 
         return events
+
+    def failure_usage(self) -> StreamFailureUsage | None:
+        return self._failure.snapshot()
+
+    def decode_failure(self) -> ErrorEvent:
+        return ErrorEvent(
+            code="stream_decode_error",
+            message="The stream contained invalid JSON.",
+            recoverable=False,
+            failure_usage=self.failure_usage(),
+        )
 
     def _accumulate_tool_calls(self, delta: dict[str, Any]) -> None:
         """Merge tool-call fragments by index.

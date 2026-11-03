@@ -6,6 +6,7 @@ import json
 import os
 import uuid
 from collections.abc import Iterator
+from contextlib import closing
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -76,8 +77,8 @@ from prism.providers.openai.request_body import build_request_body
 from prism.providers.openai.response import parse_text_response
 from prism.providers.openai.stream_events import map_stream_event
 from prism.providers.openai.structured_body import build_structured_body
-from prism.streaming.events import StreamEvent
-from prism.streaming.sse import sse_data
+from prism.streaming.events import ErrorEvent, StreamEvent
+from prism.streaming.failure_usage import StreamFailureUsageTracker, failure_aware_sse
 from prism.structured.from_text import structured_from_text_response
 from prism.structured.request import StructuredRequest
 from prism.structured.response import StructuredResponse
@@ -163,11 +164,26 @@ class OpenAI(Provider):
         return self._events(response.chunks)
 
     def _events(self, chunks: Iterator[str]) -> Iterator[StreamEvent]:
-        for payload in sse_data(chunks):
-            event = map_stream_event(_loads(payload))
+        failure = StreamFailureUsageTracker("openai")
+        with closing(failure_aware_sse(chunks, failure.snapshot)) as payloads:
+            for payload in payloads:
+                if isinstance(payload, ErrorEvent):
+                    yield payload
+                    continue
+                parsed = _stream_loads(payload)
+                if parsed is None:
+                    yield ErrorEvent(
+                        code="stream_decode_error",
+                        message="The stream contained invalid JSON.",
+                        recoverable=False,
+                        failure_usage=failure.snapshot(),
+                    )
+                    break
+                failure.record(parsed)
+                event = map_stream_event(parsed, failure.snapshot())
 
-            if event is not None:
-                yield event
+                if event is not None:
+                    yield event
 
     def embeddings(self, request: EmbeddingsRequest) -> EmbeddingsResponse:
         """Vectors for one or more inputs.
@@ -614,10 +630,14 @@ class OpenAI(Provider):
 
 
 def _loads(text: str) -> dict[str, Any]:
-    """An SSE payload that is not JSON is skipped rather than fatal."""
+    return _stream_loads(text) or {}
+
+
+def _stream_loads(text: str) -> dict[str, Any] | None:
+    """Distinguish malformed JSON from an unknown, valid payload."""
     try:
         parsed = json.loads(text)
     except ValueError:
-        return {}
+        return None
 
     return parsed if isinstance(parsed, dict) else {}
