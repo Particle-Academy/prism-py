@@ -30,7 +30,9 @@ DEFAULT_MAX_TOKENS = 4096
 DEFAULT_THINKING_BUDGET = 1024
 
 
-def build_request_body(request: Request) -> dict[str, Any]:
+def build_request_body(
+    request: Request, default_thinking_budget: int = DEFAULT_THINKING_BUDGET
+) -> dict[str, Any]:
     """Map a :class:`~prism.text.request.Request` onto the request body.
 
     The same two rules as the OpenAI body decide every key: ``model``,
@@ -59,7 +61,7 @@ def build_request_body(request: Request) -> dict[str, Any]:
         # rejected outright by others.
         "tools": map_tools(request.tools) or None,
         "tool_choice": map_tool_choice(request.tool_choice),
-        "thinking": _thinking(request),
+        "thinking": _thinking(request, default_thinking_budget),
         "metadata": request.provider_option("metadata"),
         "stop_sequences": request.provider_option("stop_sequences"),
         # ``effort`` is Prism's name for it; Anthropic reads it from
@@ -73,7 +75,9 @@ def build_request_body(request: Request) -> dict[str, Any]:
     return body
 
 
-def build_structured_body(request: StructuredRequest) -> dict[str, Any]:
+def build_structured_body(
+    request: StructuredRequest, default_thinking_budget: int = DEFAULT_THINKING_BUDGET
+) -> dict[str, Any]:
     """Native schema mode; unsupported modes are refused before transport."""
     if is_truthy(request.provider_option("use_tool_calling")):
         raise PrismError.unsupported_provider_action("Structured tool calling", "Anthropic")
@@ -83,7 +87,7 @@ def build_structured_body(request: StructuredRequest) -> dict[str, Any]:
         )
     if request.schema is None:
         raise PrismError(ErrorCode.MISSING_SCHEMA, "A structured request needs a schema.")
-    body = build_request_body(request)
+    body = build_request_body(request, default_thinking_budget)
     body["output_config"] = {
         **body.get("output_config", {}),
         "format": {"type": "json_schema", "schema": request.schema.to_dict()},
@@ -91,7 +95,7 @@ def build_structured_body(request: StructuredRequest) -> dict[str, Any]:
     return body
 
 
-def _thinking(request: Request) -> Any:
+def _thinking(request: Request, default_thinking_budget: int) -> Any:
     """The ``thinking`` field, spelled the way the reference spells it.
 
     Asymmetric like OpenAI's reasoning and for the same reason: enabling
@@ -125,8 +129,18 @@ def _thinking(request: Request) -> Any:
     if not thinking:
         return None
 
-    if thinking.get("type") == "adaptive":
-        return thinking
+    if isinstance(thinking.get("type"), str):
+        native = {
+            key: value for key, value in thinking.items() if key not in ("enabled", "budgetTokens")
+        }
+        if native["type"] == "enabled" and native.get("budget_tokens") is None:
+            budget = thinking.get("budgetTokens")
+            native["budget_tokens"] = (
+                budget
+                if isinstance(budget, int) and not isinstance(budget, bool)
+                else default_thinking_budget
+            )
+        return native
 
     if thinking.get("enabled") is True:
         budget = thinking.get("budgetTokens")
@@ -136,7 +150,7 @@ def _thinking(request: Request) -> Any:
             # bool is an int in Python and not in PHP, so True is not a budget.
             "budget_tokens": budget
             if isinstance(budget, int) and not isinstance(budget, bool)
-            else DEFAULT_THINKING_BUDGET,
+            else default_thinking_budget,
         }
 
     if "enabled" in thinking and "type" not in thinking:

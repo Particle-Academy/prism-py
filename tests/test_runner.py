@@ -58,9 +58,15 @@ def test_stream_trace_json_survives_ascii_stdout() -> None:
     )
     assert result.returncode == runner.EXIT_OK, result.stderr
     document = json.loads(result.stdout)
-    assert len(document["results"]) == {"0.1.13": 10, "0.1.14": 10, "0.1.15": 21, "0.1.16": 21}.get(
-        document["corpus_version"]
-    )
+    assert len(document["results"]) == {
+        "0.1.13": 10,
+        "0.1.14": 10,
+        "0.1.15": 21,
+        "0.1.16": 21,
+        "0.1.17": 21,
+        "0.1.18": 21,
+        "0.1.19": 21,
+    }.get(document["corpus_version"])
     assert all(row["status"] == "pass" for row in document["results"])
     trace = json.loads(document["results"][0]["trace_comparison"]["actual"])
     assert (

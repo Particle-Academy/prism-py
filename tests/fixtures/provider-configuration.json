@@ -1,0 +1,4751 @@
+{
+    "suite": "provider-configuration",
+    "schema_version": 1,
+    "corpus_version": "0.1.19",
+    "generated_by": "tools/provider-configuration.mjs with three native SDK adapters; PHP normally installed 0.146.0",
+    "scope": "156 provider config/thinking inputs and six actual FIM header round trips. Deadline, cancellation, warning lifecycle, TLS and DNS properties require native per-port tests; this serialized corpus does not measure them. G43 offsets and G125 traces remain separate.",
+    "environment_names": [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_URL",
+        "ANTHROPIC_API_VERSION",
+        "ANTHROPIC_BETA",
+        "OPENAI_API_KEY",
+        "OPENAI_URL",
+        "OPENAI_ORGANIZATION",
+        "OPENAI_PROJECT",
+        "OPENAI_API_FORMAT",
+        "MISTRAL_API_KEY",
+        "MISTRAL_URL",
+        "ANTHROPIC_DEFAULT_THINKING_BUDGET",
+        "ANTHROPIC_BETA_FEATURES"
+    ],
+    "cases": [
+        {
+            "id": "cfg-0001",
+            "title": "anthropic.api_key.default",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiKey",
+                "env": {},
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0002",
+            "title": "anthropic.api_key.environment",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiKey",
+                "env": {
+                    "ANTHROPIC_API_KEY": "synthetic-env"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-env"
+                },
+                "ts": {
+                    "value": "synthetic-env"
+                },
+                "py": {
+                    "value": "synthetic-env"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0003",
+            "title": "anthropic.api_key.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiKey",
+                "env": {
+                    "ANTHROPIC_API_KEY": ""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0004",
+            "title": "anthropic.api_key.explicit",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiKey",
+                "env": {
+                    "ANTHROPIC_API_KEY": "synthetic-env"
+                },
+                "config": {
+                    "api_key": "synthetic-explicit"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-explicit"
+                },
+                "ts": {
+                    "value": "synthetic-explicit"
+                },
+                "py": {
+                    "value": "synthetic-explicit"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0005",
+            "title": "anthropic.api_key.explicit-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiKey",
+                "env": {
+                    "ANTHROPIC_API_KEY": "synthetic-env"
+                },
+                "config": {
+                    "api_key": ""
+                }
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0006",
+            "title": "anthropic.api_key.explicit-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiKey",
+                "env": {
+                    "ANTHROPIC_API_KEY": "synthetic-env"
+                },
+                "config": {
+                    "api_key": null
+                }
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0007",
+            "title": "anthropic.url.default",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "url",
+                "env": {},
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "https://api.anthropic.com/v1"
+                },
+                "ts": {
+                    "value": "https://api.anthropic.com/v1"
+                },
+                "py": {
+                    "value": "https://api.anthropic.com/v1"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0008",
+            "title": "anthropic.url.environment",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "url",
+                "env": {
+                    "ANTHROPIC_URL": "https://env.invalid/v1"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "https://env.invalid/v1"
+                },
+                "ts": {
+                    "value": "https://env.invalid/v1"
+                },
+                "py": {
+                    "value": "https://env.invalid/v1"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0009",
+            "title": "anthropic.url.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "url",
+                "env": {
+                    "ANTHROPIC_URL": ""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0010",
+            "title": "anthropic.url.explicit",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "url",
+                "env": {
+                    "ANTHROPIC_URL": "https://env.invalid/v1"
+                },
+                "config": {
+                    "url": "https://explicit.invalid/v1"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "https://explicit.invalid/v1"
+                },
+                "ts": {
+                    "value": "https://explicit.invalid/v1"
+                },
+                "py": {
+                    "value": "https://explicit.invalid/v1"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0011",
+            "title": "anthropic.url.explicit-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "url",
+                "env": {
+                    "ANTHROPIC_URL": "https://env.invalid/v1"
+                },
+                "config": {
+                    "url": ""
+                }
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0012",
+            "title": "anthropic.url.explicit-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "url",
+                "env": {
+                    "ANTHROPIC_URL": "https://env.invalid/v1"
+                },
+                "config": {
+                    "url": null
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "https://api.anthropic.com/v1"
+                },
+                "ts": {
+                    "value": "https://api.anthropic.com/v1"
+                },
+                "py": {
+                    "value": "https://api.anthropic.com/v1"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0013",
+            "title": "anthropic.version.default",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiVersion",
+                "env": {},
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "2023-06-01"
+                },
+                "ts": {
+                    "value": "2023-06-01"
+                },
+                "py": {
+                    "value": "2023-06-01"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0014",
+            "title": "anthropic.version.environment",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiVersion",
+                "env": {
+                    "ANTHROPIC_API_VERSION": "synthetic-env"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-env"
+                },
+                "ts": {
+                    "value": "synthetic-env"
+                },
+                "py": {
+                    "value": "synthetic-env"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0015",
+            "title": "anthropic.version.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiVersion",
+                "env": {
+                    "ANTHROPIC_API_VERSION": ""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0016",
+            "title": "anthropic.version.explicit",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiVersion",
+                "env": {
+                    "ANTHROPIC_API_VERSION": "synthetic-env"
+                },
+                "config": {
+                    "version": "synthetic-explicit"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-explicit"
+                },
+                "ts": {
+                    "value": "synthetic-explicit"
+                },
+                "py": {
+                    "value": "synthetic-explicit"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0017",
+            "title": "anthropic.version.explicit-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiVersion",
+                "env": {
+                    "ANTHROPIC_API_VERSION": "synthetic-env"
+                },
+                "config": {
+                    "version": ""
+                }
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0018",
+            "title": "anthropic.version.explicit-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiVersion",
+                "env": {
+                    "ANTHROPIC_API_VERSION": "synthetic-env"
+                },
+                "config": {
+                    "version": null
+                }
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0019",
+            "title": "anthropic.anthropic_beta.default",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "betaFeatures",
+                "env": {},
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": null
+                },
+                "ts": {
+                    "value": null
+                },
+                "py": {
+                    "value": null
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0020",
+            "title": "anthropic.anthropic_beta.environment",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "betaFeatures",
+                "env": {
+                    "ANTHROPIC_BETA": "synthetic-env"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-env"
+                },
+                "ts": {
+                    "value": "synthetic-env"
+                },
+                "py": {
+                    "value": "synthetic-env"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0021",
+            "title": "anthropic.anthropic_beta.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "betaFeatures",
+                "env": {
+                    "ANTHROPIC_BETA": ""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0022",
+            "title": "anthropic.anthropic_beta.explicit",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "betaFeatures",
+                "env": {
+                    "ANTHROPIC_BETA": "synthetic-env"
+                },
+                "config": {
+                    "anthropic_beta": "synthetic-explicit"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-explicit"
+                },
+                "ts": {
+                    "value": "synthetic-explicit"
+                },
+                "py": {
+                    "value": "synthetic-explicit"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0023",
+            "title": "anthropic.anthropic_beta.explicit-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "betaFeatures",
+                "env": {
+                    "ANTHROPIC_BETA": "synthetic-env"
+                },
+                "config": {
+                    "anthropic_beta": ""
+                }
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0024",
+            "title": "anthropic.anthropic_beta.explicit-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "betaFeatures",
+                "env": {
+                    "ANTHROPIC_BETA": "synthetic-env"
+                },
+                "config": {
+                    "anthropic_beta": null
+                }
+            },
+            "result": {
+                "php": {
+                    "value": null
+                },
+                "ts": {
+                    "value": null
+                },
+                "py": {
+                    "value": null
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0025",
+            "title": "openai.api_key.default",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiKey",
+                "env": {},
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0026",
+            "title": "openai.api_key.environment",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiKey",
+                "env": {
+                    "OPENAI_API_KEY": "synthetic-env"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-env"
+                },
+                "ts": {
+                    "value": "synthetic-env"
+                },
+                "py": {
+                    "value": "synthetic-env"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0027",
+            "title": "openai.api_key.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiKey",
+                "env": {
+                    "OPENAI_API_KEY": ""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0028",
+            "title": "openai.api_key.explicit",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiKey",
+                "env": {
+                    "OPENAI_API_KEY": "synthetic-env"
+                },
+                "config": {
+                    "api_key": "synthetic-explicit"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-explicit"
+                },
+                "ts": {
+                    "value": "synthetic-explicit"
+                },
+                "py": {
+                    "value": "synthetic-explicit"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0029",
+            "title": "openai.api_key.explicit-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiKey",
+                "env": {
+                    "OPENAI_API_KEY": "synthetic-env"
+                },
+                "config": {
+                    "api_key": ""
+                }
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0030",
+            "title": "openai.api_key.explicit-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiKey",
+                "env": {
+                    "OPENAI_API_KEY": "synthetic-env"
+                },
+                "config": {
+                    "api_key": null
+                }
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0031",
+            "title": "openai.url.default",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "url",
+                "env": {},
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "https://api.openai.com/v1"
+                },
+                "ts": {
+                    "value": "https://api.openai.com/v1"
+                },
+                "py": {
+                    "value": "https://api.openai.com/v1"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0032",
+            "title": "openai.url.environment",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "url",
+                "env": {
+                    "OPENAI_URL": "https://env.invalid/v1"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "https://env.invalid/v1"
+                },
+                "ts": {
+                    "value": "https://env.invalid/v1"
+                },
+                "py": {
+                    "value": "https://env.invalid/v1"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0033",
+            "title": "openai.url.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "url",
+                "env": {
+                    "OPENAI_URL": ""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0034",
+            "title": "openai.url.explicit",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "url",
+                "env": {
+                    "OPENAI_URL": "https://env.invalid/v1"
+                },
+                "config": {
+                    "url": "https://explicit.invalid/v1"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "https://explicit.invalid/v1"
+                },
+                "ts": {
+                    "value": "https://explicit.invalid/v1"
+                },
+                "py": {
+                    "value": "https://explicit.invalid/v1"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0035",
+            "title": "openai.url.explicit-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "url",
+                "env": {
+                    "OPENAI_URL": "https://env.invalid/v1"
+                },
+                "config": {
+                    "url": ""
+                }
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0036",
+            "title": "openai.url.explicit-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "url",
+                "env": {
+                    "OPENAI_URL": "https://env.invalid/v1"
+                },
+                "config": {
+                    "url": null
+                }
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0037",
+            "title": "openai.organization.default",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "env": {},
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": null
+                },
+                "ts": {
+                    "value": null
+                },
+                "py": {
+                    "value": null
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0038",
+            "title": "openai.organization.environment",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "env": {
+                    "OPENAI_ORGANIZATION": "synthetic-env"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-env"
+                },
+                "ts": {
+                    "value": "synthetic-env"
+                },
+                "py": {
+                    "value": "synthetic-env"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0039",
+            "title": "openai.organization.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "env": {
+                    "OPENAI_ORGANIZATION": ""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0040",
+            "title": "openai.organization.explicit",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "env": {
+                    "OPENAI_ORGANIZATION": "synthetic-env"
+                },
+                "config": {
+                    "organization": "synthetic-explicit"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-explicit"
+                },
+                "ts": {
+                    "value": "synthetic-explicit"
+                },
+                "py": {
+                    "value": "synthetic-explicit"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0041",
+            "title": "openai.organization.explicit-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "env": {
+                    "OPENAI_ORGANIZATION": "synthetic-env"
+                },
+                "config": {
+                    "organization": ""
+                }
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0042",
+            "title": "openai.organization.explicit-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "env": {
+                    "OPENAI_ORGANIZATION": "synthetic-env"
+                },
+                "config": {
+                    "organization": null
+                }
+            },
+            "result": {
+                "php": {
+                    "value": null
+                },
+                "ts": {
+                    "value": null
+                },
+                "py": {
+                    "value": null
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0043",
+            "title": "openai.project.default",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "project",
+                "env": {},
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": null
+                },
+                "ts": {
+                    "value": null
+                },
+                "py": {
+                    "value": null
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0044",
+            "title": "openai.project.environment",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "project",
+                "env": {
+                    "OPENAI_PROJECT": "synthetic-env"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-env"
+                },
+                "ts": {
+                    "value": "synthetic-env"
+                },
+                "py": {
+                    "value": "synthetic-env"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0045",
+            "title": "openai.project.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "project",
+                "env": {
+                    "OPENAI_PROJECT": ""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0046",
+            "title": "openai.project.explicit",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "project",
+                "env": {
+                    "OPENAI_PROJECT": "synthetic-env"
+                },
+                "config": {
+                    "project": "synthetic-explicit"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-explicit"
+                },
+                "ts": {
+                    "value": "synthetic-explicit"
+                },
+                "py": {
+                    "value": "synthetic-explicit"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0047",
+            "title": "openai.project.explicit-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "project",
+                "env": {
+                    "OPENAI_PROJECT": "synthetic-env"
+                },
+                "config": {
+                    "project": ""
+                }
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0048",
+            "title": "openai.project.explicit-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "project",
+                "env": {
+                    "OPENAI_PROJECT": "synthetic-env"
+                },
+                "config": {
+                    "project": null
+                }
+            },
+            "result": {
+                "php": {
+                    "value": null
+                },
+                "ts": {
+                    "value": null
+                },
+                "py": {
+                    "value": null
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0049",
+            "title": "openai.api_format.default",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiFormat",
+                "env": {},
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "responses"
+                },
+                "ts": {
+                    "value": "responses"
+                },
+                "py": {
+                    "value": "responses"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0050",
+            "title": "openai.api_format.environment",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiFormat",
+                "env": {
+                    "OPENAI_API_FORMAT": "synthetic-env"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-env"
+                },
+                "ts": {
+                    "value": "synthetic-env"
+                },
+                "py": {
+                    "value": "synthetic-env"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0051",
+            "title": "openai.api_format.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiFormat",
+                "env": {
+                    "OPENAI_API_FORMAT": ""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0052",
+            "title": "openai.api_format.explicit",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiFormat",
+                "env": {
+                    "OPENAI_API_FORMAT": "synthetic-env"
+                },
+                "config": {
+                    "api_format": "synthetic-explicit"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-explicit"
+                },
+                "ts": {
+                    "value": "synthetic-explicit"
+                },
+                "py": {
+                    "value": "synthetic-explicit"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0053",
+            "title": "openai.api_format.explicit-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiFormat",
+                "env": {
+                    "OPENAI_API_FORMAT": "synthetic-env"
+                },
+                "config": {
+                    "api_format": ""
+                }
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0054",
+            "title": "openai.api_format.explicit-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiFormat",
+                "env": {
+                    "OPENAI_API_FORMAT": "synthetic-env"
+                },
+                "config": {
+                    "api_format": null
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "responses"
+                },
+                "ts": {
+                    "value": "responses"
+                },
+                "py": {
+                    "value": "responses"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0055",
+            "title": "mistral.api_key.default",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "apiKey",
+                "env": {},
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0056",
+            "title": "mistral.api_key.environment",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "apiKey",
+                "env": {
+                    "MISTRAL_API_KEY": "synthetic-env"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-env"
+                },
+                "ts": {
+                    "value": "synthetic-env"
+                },
+                "py": {
+                    "value": "synthetic-env"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0057",
+            "title": "mistral.api_key.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "apiKey",
+                "env": {
+                    "MISTRAL_API_KEY": ""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0058",
+            "title": "mistral.api_key.explicit",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "apiKey",
+                "env": {
+                    "MISTRAL_API_KEY": "synthetic-env"
+                },
+                "config": {
+                    "api_key": "synthetic-explicit"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-explicit"
+                },
+                "ts": {
+                    "value": "synthetic-explicit"
+                },
+                "py": {
+                    "value": "synthetic-explicit"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0059",
+            "title": "mistral.api_key.explicit-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "apiKey",
+                "env": {
+                    "MISTRAL_API_KEY": "synthetic-env"
+                },
+                "config": {
+                    "api_key": ""
+                }
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0060",
+            "title": "mistral.api_key.explicit-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "apiKey",
+                "env": {
+                    "MISTRAL_API_KEY": "synthetic-env"
+                },
+                "config": {
+                    "api_key": null
+                }
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0061",
+            "title": "mistral.url.default",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "url",
+                "env": {},
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "https://api.mistral.ai/v1"
+                },
+                "ts": {
+                    "value": "https://api.mistral.ai/v1"
+                },
+                "py": {
+                    "value": "https://api.mistral.ai/v1"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0062",
+            "title": "mistral.url.environment",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "url",
+                "env": {
+                    "MISTRAL_URL": "https://env.invalid/v1"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "https://env.invalid/v1"
+                },
+                "ts": {
+                    "value": "https://env.invalid/v1"
+                },
+                "py": {
+                    "value": "https://env.invalid/v1"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0063",
+            "title": "mistral.url.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "url",
+                "env": {
+                    "MISTRAL_URL": ""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0064",
+            "title": "mistral.url.explicit",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "url",
+                "env": {
+                    "MISTRAL_URL": "https://env.invalid/v1"
+                },
+                "config": {
+                    "url": "https://explicit.invalid/v1"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "https://explicit.invalid/v1"
+                },
+                "ts": {
+                    "value": "https://explicit.invalid/v1"
+                },
+                "py": {
+                    "value": "https://explicit.invalid/v1"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0065",
+            "title": "mistral.url.explicit-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "url",
+                "env": {
+                    "MISTRAL_URL": "https://env.invalid/v1"
+                },
+                "config": {
+                    "url": ""
+                }
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0066",
+            "title": "mistral.url.explicit-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "url",
+                "env": {
+                    "MISTRAL_URL": "https://env.invalid/v1"
+                },
+                "config": {
+                    "url": null
+                }
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0067",
+            "title": "thinking.config.absent",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 1024
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 1024
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 1024
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0068",
+            "title": "thinking.config.integer",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                },
+                "defaultConfig": 4096
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 4096
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 4096
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 4096
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0069",
+            "title": "thinking.config.string",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                },
+                "defaultConfig": "4096"
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 4096
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 4096
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 4096
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0070",
+            "title": "thinking.config.decimal",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                },
+                "defaultConfig": "20.9"
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 20
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 20
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 20
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0071",
+            "title": "thinking.config.prefix",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                },
+                "defaultConfig": "25tokens"
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 25
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 25
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 25
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0072",
+            "title": "thinking.config.exponent",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                },
+                "defaultConfig": "1e3"
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 1000
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 1000
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 1000
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0073",
+            "title": "thinking.config.malformed",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                },
+                "defaultConfig": "invalid"
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0074",
+            "title": "thinking.config.empty",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                },
+                "defaultConfig": ""
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0075",
+            "title": "thinking.config.null",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                },
+                "defaultConfig": null
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0076",
+            "title": "thinking.config.false",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                },
+                "defaultConfig": false
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0077",
+            "title": "thinking.config.true",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                },
+                "defaultConfig": true
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 1
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 1
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 1
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0078",
+            "title": "thinking.config.zero",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                },
+                "defaultConfig": 0
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0079",
+            "title": "thinking.config.negative",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "thinking": {
+                    "enabled": true
+                },
+                "defaultConfig": -2
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": -2
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": -2
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": -2
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0080",
+            "title": "thinking.environment",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "env": {
+                    "ANTHROPIC_DEFAULT_THINKING_BUDGET": "2048"
+                },
+                "thinking": {
+                    "enabled": true
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0081",
+            "title": "thinking.request.integer",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": {
+                    "enabled": true,
+                    "budgetTokens": 8192
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 8192
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 8192
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 8192
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0082",
+            "title": "thinking.request.zero",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": {
+                    "enabled": true,
+                    "budgetTokens": 0
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0083",
+            "title": "thinking.request.negative",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": {
+                    "enabled": true,
+                    "budgetTokens": -1
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": -1
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": -1
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": -1
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0084",
+            "title": "thinking.request.string",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": {
+                    "enabled": true,
+                    "budgetTokens": "8192"
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0085",
+            "title": "thinking.request.float",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": {
+                    "enabled": true,
+                    "budgetTokens": 1.5
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0086",
+            "title": "thinking.request.bool",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": {
+                    "enabled": true,
+                    "budgetTokens": true
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0087",
+            "title": "thinking.request.null",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": {
+                    "enabled": true,
+                    "budgetTokens": null
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0088",
+            "title": "thinking.shape.disabled",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": false
+            },
+            "result": {
+                "php": {
+                    "thinking": null
+                },
+                "ts": {
+                    "thinking": null
+                },
+                "py": {
+                    "thinking": null
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0089",
+            "title": "thinking.shape.empty",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": {}
+            },
+            "result": {
+                "php": {
+                    "thinking": null
+                },
+                "ts": {
+                    "thinking": null
+                },
+                "py": {
+                    "thinking": null
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0090",
+            "title": "thinking.shape.toggle",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": {
+                    "enabled": true
+                },
+                "reasoning": false
+            },
+            "result": {
+                "php": {
+                    "thinking": null
+                },
+                "ts": {
+                    "thinking": null
+                },
+                "py": {
+                    "thinking": null
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0091",
+            "title": "thinking.shape.adaptive",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": {
+                    "type": "adaptive"
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "adaptive"
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "adaptive"
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "adaptive"
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0092",
+            "title": "thinking.shape.typed-enabled",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": {
+                    "type": "enabled"
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0093",
+            "title": "thinking.shape.typed-explicit",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "defaultConfig": 2048,
+                "thinking": {
+                    "type": "enabled",
+                    "budget_tokens": 3072
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 3072
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 3072
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 3072
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0094",
+            "title": "anthropic.api_key.environment-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiKey",
+                "env": {
+                    "ANTHROPIC_API_KEY": "null"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0095",
+            "title": "anthropic.api_key.environment-true",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiKey",
+                "env": {
+                    "ANTHROPIC_API_KEY": "true"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0096",
+            "title": "anthropic.api_key.environment-false",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiKey",
+                "env": {
+                    "ANTHROPIC_API_KEY": "(false)"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0097",
+            "title": "anthropic.api_key.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiKey",
+                "env": {
+                    "ANTHROPIC_API_KEY": "empty"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0098",
+            "title": "anthropic.api_key.environment-quoted",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiKey",
+                "env": {
+                    "ANTHROPIC_API_KEY": "\"synthetic-quoted\""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-quoted"
+                },
+                "ts": {
+                    "value": "synthetic-quoted"
+                },
+                "py": {
+                    "value": "synthetic-quoted"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0099",
+            "title": "anthropic.url.environment-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "url",
+                "env": {
+                    "ANTHROPIC_URL": "null"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "https://api.anthropic.com/v1"
+                },
+                "ts": {
+                    "value": "https://api.anthropic.com/v1"
+                },
+                "py": {
+                    "value": "https://api.anthropic.com/v1"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0100",
+            "title": "anthropic.url.environment-true",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "url",
+                "env": {
+                    "ANTHROPIC_URL": "true"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0101",
+            "title": "anthropic.url.environment-false",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "url",
+                "env": {
+                    "ANTHROPIC_URL": "(false)"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0102",
+            "title": "anthropic.url.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "url",
+                "env": {
+                    "ANTHROPIC_URL": "empty"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0103",
+            "title": "anthropic.url.environment-quoted",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "url",
+                "env": {
+                    "ANTHROPIC_URL": "\"synthetic-quoted\""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-quoted"
+                },
+                "ts": {
+                    "value": "synthetic-quoted"
+                },
+                "py": {
+                    "value": "synthetic-quoted"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0104",
+            "title": "anthropic.version.environment-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiVersion",
+                "env": {
+                    "ANTHROPIC_API_VERSION": "null"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0105",
+            "title": "anthropic.version.environment-true",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiVersion",
+                "env": {
+                    "ANTHROPIC_API_VERSION": "true"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0106",
+            "title": "anthropic.version.environment-false",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiVersion",
+                "env": {
+                    "ANTHROPIC_API_VERSION": "(false)"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0107",
+            "title": "anthropic.version.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiVersion",
+                "env": {
+                    "ANTHROPIC_API_VERSION": "empty"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0108",
+            "title": "anthropic.version.environment-quoted",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "apiVersion",
+                "env": {
+                    "ANTHROPIC_API_VERSION": "\"synthetic-quoted\""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-quoted"
+                },
+                "ts": {
+                    "value": "synthetic-quoted"
+                },
+                "py": {
+                    "value": "synthetic-quoted"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0109",
+            "title": "anthropic.anthropic_beta.environment-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "betaFeatures",
+                "env": {
+                    "ANTHROPIC_BETA": "null"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": null
+                },
+                "ts": {
+                    "value": null
+                },
+                "py": {
+                    "value": null
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0110",
+            "title": "anthropic.anthropic_beta.environment-true",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "betaFeatures",
+                "env": {
+                    "ANTHROPIC_BETA": "true"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0111",
+            "title": "anthropic.anthropic_beta.environment-false",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "betaFeatures",
+                "env": {
+                    "ANTHROPIC_BETA": "(false)"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0112",
+            "title": "anthropic.anthropic_beta.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "betaFeatures",
+                "env": {
+                    "ANTHROPIC_BETA": "empty"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0113",
+            "title": "anthropic.anthropic_beta.environment-quoted",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "anthropic",
+                "property": "betaFeatures",
+                "env": {
+                    "ANTHROPIC_BETA": "\"synthetic-quoted\""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-quoted"
+                },
+                "ts": {
+                    "value": "synthetic-quoted"
+                },
+                "py": {
+                    "value": "synthetic-quoted"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0114",
+            "title": "openai.api_key.environment-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiKey",
+                "env": {
+                    "OPENAI_API_KEY": "null"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0115",
+            "title": "openai.api_key.environment-true",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiKey",
+                "env": {
+                    "OPENAI_API_KEY": "true"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0116",
+            "title": "openai.api_key.environment-false",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiKey",
+                "env": {
+                    "OPENAI_API_KEY": "(false)"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0117",
+            "title": "openai.api_key.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiKey",
+                "env": {
+                    "OPENAI_API_KEY": "empty"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0118",
+            "title": "openai.api_key.environment-quoted",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiKey",
+                "env": {
+                    "OPENAI_API_KEY": "\"synthetic-quoted\""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-quoted"
+                },
+                "ts": {
+                    "value": "synthetic-quoted"
+                },
+                "py": {
+                    "value": "synthetic-quoted"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0119",
+            "title": "openai.url.environment-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "url",
+                "env": {
+                    "OPENAI_URL": "null"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0120",
+            "title": "openai.url.environment-true",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "url",
+                "env": {
+                    "OPENAI_URL": "true"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0121",
+            "title": "openai.url.environment-false",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "url",
+                "env": {
+                    "OPENAI_URL": "(false)"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0122",
+            "title": "openai.url.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "url",
+                "env": {
+                    "OPENAI_URL": "empty"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0123",
+            "title": "openai.url.environment-quoted",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "url",
+                "env": {
+                    "OPENAI_URL": "\"synthetic-quoted\""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-quoted"
+                },
+                "ts": {
+                    "value": "synthetic-quoted"
+                },
+                "py": {
+                    "value": "synthetic-quoted"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0124",
+            "title": "openai.organization.environment-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "env": {
+                    "OPENAI_ORGANIZATION": "null"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": null
+                },
+                "ts": {
+                    "value": null
+                },
+                "py": {
+                    "value": null
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0125",
+            "title": "openai.organization.environment-true",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "env": {
+                    "OPENAI_ORGANIZATION": "true"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0126",
+            "title": "openai.organization.environment-false",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "env": {
+                    "OPENAI_ORGANIZATION": "(false)"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0127",
+            "title": "openai.organization.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "env": {
+                    "OPENAI_ORGANIZATION": "empty"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0128",
+            "title": "openai.organization.environment-quoted",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "env": {
+                    "OPENAI_ORGANIZATION": "\"synthetic-quoted\""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-quoted"
+                },
+                "ts": {
+                    "value": "synthetic-quoted"
+                },
+                "py": {
+                    "value": "synthetic-quoted"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0129",
+            "title": "openai.project.environment-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "project",
+                "env": {
+                    "OPENAI_PROJECT": "null"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": null
+                },
+                "ts": {
+                    "value": null
+                },
+                "py": {
+                    "value": null
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0130",
+            "title": "openai.project.environment-true",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "project",
+                "env": {
+                    "OPENAI_PROJECT": "true"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0131",
+            "title": "openai.project.environment-false",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "project",
+                "env": {
+                    "OPENAI_PROJECT": "(false)"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0132",
+            "title": "openai.project.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "project",
+                "env": {
+                    "OPENAI_PROJECT": "empty"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0133",
+            "title": "openai.project.environment-quoted",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "project",
+                "env": {
+                    "OPENAI_PROJECT": "\"synthetic-quoted\""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-quoted"
+                },
+                "ts": {
+                    "value": "synthetic-quoted"
+                },
+                "py": {
+                    "value": "synthetic-quoted"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0134",
+            "title": "openai.api_format.environment-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiFormat",
+                "env": {
+                    "OPENAI_API_FORMAT": "null"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "responses"
+                },
+                "ts": {
+                    "value": "responses"
+                },
+                "py": {
+                    "value": "responses"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0135",
+            "title": "openai.api_format.environment-true",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiFormat",
+                "env": {
+                    "OPENAI_API_FORMAT": "true"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0136",
+            "title": "openai.api_format.environment-false",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiFormat",
+                "env": {
+                    "OPENAI_API_FORMAT": "(false)"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0137",
+            "title": "openai.api_format.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiFormat",
+                "env": {
+                    "OPENAI_API_FORMAT": "empty"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0138",
+            "title": "openai.api_format.environment-quoted",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "apiFormat",
+                "env": {
+                    "OPENAI_API_FORMAT": "\"synthetic-quoted\""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-quoted"
+                },
+                "ts": {
+                    "value": "synthetic-quoted"
+                },
+                "py": {
+                    "value": "synthetic-quoted"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0139",
+            "title": "mistral.api_key.environment-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "apiKey",
+                "env": {
+                    "MISTRAL_API_KEY": "null"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0140",
+            "title": "mistral.api_key.environment-true",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "apiKey",
+                "env": {
+                    "MISTRAL_API_KEY": "true"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0141",
+            "title": "mistral.api_key.environment-false",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "apiKey",
+                "env": {
+                    "MISTRAL_API_KEY": "(false)"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0142",
+            "title": "mistral.api_key.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "apiKey",
+                "env": {
+                    "MISTRAL_API_KEY": "empty"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0143",
+            "title": "mistral.api_key.environment-quoted",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "apiKey",
+                "env": {
+                    "MISTRAL_API_KEY": "\"synthetic-quoted\""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-quoted"
+                },
+                "ts": {
+                    "value": "synthetic-quoted"
+                },
+                "py": {
+                    "value": "synthetic-quoted"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0144",
+            "title": "mistral.url.environment-null",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "url",
+                "env": {
+                    "MISTRAL_URL": "null"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0145",
+            "title": "mistral.url.environment-true",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "url",
+                "env": {
+                    "MISTRAL_URL": "true"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0146",
+            "title": "mistral.url.environment-false",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "url",
+                "env": {
+                    "MISTRAL_URL": "(false)"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "error": "TypeError"
+                },
+                "ts": {
+                    "error": "TypeError"
+                },
+                "py": {
+                    "error": "TypeError"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0147",
+            "title": "mistral.url.environment-empty",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "url",
+                "env": {
+                    "MISTRAL_URL": "empty"
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": ""
+                },
+                "ts": {
+                    "value": ""
+                },
+                "py": {
+                    "value": ""
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0148",
+            "title": "mistral.url.environment-quoted",
+            "since": "0.1.19",
+            "notes": "Presence, explicit null and empty strings are observed through the native provider constructor/manager. Environment values are synthetic.",
+            "given": {
+                "kind": "config",
+                "provider": "mistral",
+                "property": "url",
+                "env": {
+                    "MISTRAL_URL": "\"synthetic-quoted\""
+                },
+                "config": {}
+            },
+            "result": {
+                "php": {
+                    "value": "synthetic-quoted"
+                },
+                "ts": {
+                    "value": "synthetic-quoted"
+                },
+                "py": {
+                    "value": "synthetic-quoted"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0149",
+            "title": "thinking.environment-true",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "env": {
+                    "ANTHROPIC_DEFAULT_THINKING_BUDGET": "true"
+                },
+                "thinking": {
+                    "enabled": true
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 1
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 1
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 1
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0150",
+            "title": "thinking.environment-false",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "env": {
+                    "ANTHROPIC_DEFAULT_THINKING_BUDGET": "false"
+                },
+                "thinking": {
+                    "enabled": true
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0151",
+            "title": "thinking.environment-null",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "env": {
+                    "ANTHROPIC_DEFAULT_THINKING_BUDGET": "(null)"
+                },
+                "thinking": {
+                    "enabled": true
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0152",
+            "title": "thinking.environment-empty",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "env": {
+                    "ANTHROPIC_DEFAULT_THINKING_BUDGET": "(empty)"
+                },
+                "thinking": {
+                    "enabled": true
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 0
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0153",
+            "title": "thinking.environment-quoted",
+            "since": "0.1.19",
+            "notes": "The actual request mapper supplies thinking configuration. Configured default casting and per-request integer precedence are separate inputs.",
+            "given": {
+                "kind": "thinking",
+                "env": {
+                    "ANTHROPIC_DEFAULT_THINKING_BUDGET": "\"2048\""
+                },
+                "thinking": {
+                    "enabled": true
+                }
+            },
+            "result": {
+                "php": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "ts": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                },
+                "py": {
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 2048
+                    }
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0154",
+            "title": "fim.present",
+            "since": "0.1.19",
+            "notes": "One native Mistral FIM dispatch receives these exact-case headers. Clock and default timezone are fixed to UTC; existing prl-0005 offset divergence is outside this row and unchanged.",
+            "given": {
+                "kind": "fim",
+                "provider": "mistral",
+                "now": 1800000000,
+                "headers": {
+                    "ratelimitbysize-limit": "100",
+                    "ratelimitbysize-remaining": "75",
+                    "ratelimitbysize-reset": "5"
+                }
+            },
+            "result": {
+                "php": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": [
+                        {
+                            "name": "tokens",
+                            "limit": 100,
+                            "remaining": 75,
+                            "resets_at": "2027-01-15T08:00:05+00:00"
+                        }
+                    ]
+                },
+                "ts": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": [
+                        {
+                            "name": "tokens",
+                            "limit": 100,
+                            "remaining": 75,
+                            "resets_at": "2027-01-15T08:00:05+00:00"
+                        }
+                    ]
+                },
+                "py": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": [
+                        {
+                            "name": "tokens",
+                            "limit": 100,
+                            "remaining": 75,
+                            "resets_at": "2027-01-15T08:00:05+00:00"
+                        }
+                    ]
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0155",
+            "title": "fim.ascii-case",
+            "since": "0.1.19",
+            "notes": "One native Mistral FIM dispatch receives these exact-case headers. Clock and default timezone are fixed to UTC; existing prl-0005 offset divergence is outside this row and unchanged.",
+            "given": {
+                "kind": "fim",
+                "provider": "mistral",
+                "now": 1800000000,
+                "headers": {
+                    "RateLimitBySize-LIMIT": "100",
+                    "RATELIMITBYSIZE-remaining": "75",
+                    "RateLimitBySize-RESET": "5"
+                }
+            },
+            "result": {
+                "php": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": [
+                        {
+                            "name": "tokens",
+                            "limit": 100,
+                            "remaining": 75,
+                            "resets_at": "2027-01-15T08:00:05+00:00"
+                        }
+                    ]
+                },
+                "ts": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": [
+                        {
+                            "name": "tokens",
+                            "limit": 100,
+                            "remaining": 75,
+                            "resets_at": "2027-01-15T08:00:05+00:00"
+                        }
+                    ]
+                },
+                "py": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": [
+                        {
+                            "name": "tokens",
+                            "limit": 100,
+                            "remaining": 75,
+                            "resets_at": "2027-01-15T08:00:05+00:00"
+                        }
+                    ]
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0156",
+            "title": "fim.absent",
+            "since": "0.1.19",
+            "notes": "One native Mistral FIM dispatch receives these exact-case headers. Clock and default timezone are fixed to UTC; existing prl-0005 offset divergence is outside this row and unchanged.",
+            "given": {
+                "kind": "fim",
+                "provider": "mistral",
+                "now": 1800000000,
+                "headers": {}
+            },
+            "result": {
+                "php": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": []
+                },
+                "ts": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": []
+                },
+                "py": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": []
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0157",
+            "title": "fim.missing-limit",
+            "since": "0.1.19",
+            "notes": "One native Mistral FIM dispatch receives these exact-case headers. Clock and default timezone are fixed to UTC; existing prl-0005 offset divergence is outside this row and unchanged.",
+            "given": {
+                "kind": "fim",
+                "provider": "mistral",
+                "now": 1800000000,
+                "headers": {
+                    "ratelimitbysize-remaining": "75",
+                    "ratelimitbysize-reset": "5"
+                }
+            },
+            "result": {
+                "php": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": []
+                },
+                "ts": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": []
+                },
+                "py": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": []
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0158",
+            "title": "fim.missing-remaining",
+            "since": "0.1.19",
+            "notes": "One native Mistral FIM dispatch receives these exact-case headers. Clock and default timezone are fixed to UTC; existing prl-0005 offset divergence is outside this row and unchanged.",
+            "given": {
+                "kind": "fim",
+                "provider": "mistral",
+                "now": 1800000000,
+                "headers": {
+                    "ratelimitbysize-limit": "100",
+                    "ratelimitbysize-reset": "5"
+                }
+            },
+            "result": {
+                "php": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": []
+                },
+                "ts": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": []
+                },
+                "py": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": []
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0159",
+            "title": "fim.zero",
+            "since": "0.1.19",
+            "notes": "One native Mistral FIM dispatch receives these exact-case headers. Clock and default timezone are fixed to UTC; existing prl-0005 offset divergence is outside this row and unchanged.",
+            "given": {
+                "kind": "fim",
+                "provider": "mistral",
+                "now": 1800000000,
+                "headers": {
+                    "ratelimitbysize-limit": "0",
+                    "ratelimitbysize-remaining": "0",
+                    "ratelimitbysize-reset": "5"
+                }
+            },
+            "result": {
+                "php": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": [
+                        {
+                            "name": "tokens",
+                            "limit": 0,
+                            "remaining": 0,
+                            "resets_at": "2027-01-15T08:00:05+00:00"
+                        }
+                    ]
+                },
+                "ts": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": [
+                        {
+                            "name": "tokens",
+                            "limit": 0,
+                            "remaining": 0,
+                            "resets_at": "2027-01-15T08:00:05+00:00"
+                        }
+                    ]
+                },
+                "py": {
+                    "count": 1,
+                    "text": "ok",
+                    "rates": [
+                        {
+                            "name": "tokens",
+                            "limit": 0,
+                            "remaining": 0,
+                            "resets_at": "2027-01-15T08:00:05+00:00"
+                        }
+                    ]
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0160",
+            "title": "quoted-final-lf",
+            "since": "0.1.19",
+            "notes": "A newline prevents native full-string quote removal; stripping a quoted prefix changes the configured identifier.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "config": {},
+                "env": {
+                    "OPENAI_ORGANIZATION": "\"quoted\"\n"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "\"quoted\"\n"
+                },
+                "ts": {
+                    "value": "\"quoted\"\n"
+                },
+                "py": {
+                    "value": "\"quoted\"\n"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0161",
+            "title": "quoted-final-crlf",
+            "since": "0.1.19",
+            "notes": "A newline prevents native full-string quote removal; stripping a quoted prefix changes the configured identifier.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "config": {},
+                "env": {
+                    "OPENAI_ORGANIZATION": "'quoted'\r\n"
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "'quoted'\r\n"
+                },
+                "ts": {
+                    "value": "'quoted'\r\n"
+                },
+                "py": {
+                    "value": "'quoted'\r\n"
+                }
+            },
+            "agrees": true
+        },
+        {
+            "id": "cfg-0162",
+            "title": "quoted-embedded-lf",
+            "since": "0.1.19",
+            "notes": "A newline prevents native full-string quote removal; stripping a quoted prefix changes the configured identifier.",
+            "given": {
+                "kind": "config",
+                "provider": "openai",
+                "property": "organization",
+                "config": {},
+                "env": {
+                    "OPENAI_ORGANIZATION": "\"line\nbreak\""
+                }
+            },
+            "result": {
+                "php": {
+                    "value": "\"line\nbreak\""
+                },
+                "ts": {
+                    "value": "\"line\nbreak\""
+                },
+                "py": {
+                    "value": "\"line\nbreak\""
+                }
+            },
+            "agrees": true
+        }
+    ]
+}

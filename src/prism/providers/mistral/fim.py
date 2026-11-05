@@ -10,6 +10,7 @@ from prism.fim.request import FimRequest
 from prism.fim.response import FimResponse
 from prism.providers.mistral.response import first_choice_message, validate_response
 from prism.value_objects.meta import Meta
+from prism.value_objects.provider_rate_limit import ProviderRateLimit
 from prism.value_objects.usage import Usage
 
 __all__ = ["parse_fim_response"]
@@ -24,7 +25,9 @@ _FIM_FINISH_REASONS = {
 }
 
 
-def parse_fim_response(raw_body: Any, request: FimRequest) -> FimResponse:
+def parse_fim_response(
+    raw_body: Any, request: FimRequest, rate_limits: list[ProviderRateLimit] | None = None
+) -> FimResponse:
     """Parse a FIM completion.
 
     Unlike :func:`~prism.providers.mistral.response.parse_text_response`, a
@@ -52,6 +55,7 @@ def parse_fim_response(raw_body: Any, request: FimRequest) -> FimResponse:
         meta=Meta(
             id=_string(data.get("id")),
             model=_string(data.get("model")) or request.model,
+            rate_limits=rate_limits if rate_limits is not None else [],
         ),
         raw=data,
     )

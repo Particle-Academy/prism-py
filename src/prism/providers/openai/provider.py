@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import uuid
 from collections.abc import Iterator
 from contextlib import closing
@@ -48,6 +47,7 @@ from prism.images.response import ImagesResponse
 from prism.moderation.request import ModerationRequest
 from prism.moderation.response import ModerationResponse
 from prism.providers.base import Provider
+from prism.providers.config import UNSET, Unset, configured_string, nullable_string
 from prism.providers.openai.audio import (
     build_speech_body,
     build_transcription_form,
@@ -95,7 +95,7 @@ class OpenAI(Provider):
 
     Configuration comes from explicit constructor arguments, falling back to
     ``OPENAI_API_KEY`` / ``OPENAI_URL`` / ``OPENAI_ORGANIZATION`` /
-    ``OPENAI_PROJECT``.
+    ``OPENAI_PROJECT`` / ``OPENAI_API_FORMAT``.
 
     ``transport`` is injectable so nothing here has to reach the network in a
     test.
@@ -103,22 +103,22 @@ class OpenAI(Provider):
 
     def __init__(
         self,
-        api_key: str | None = None,
-        url: str | None = None,
-        organization: str | None = None,
-        project: str | None = None,
-        api_format: str = "responses",
+        api_key: str | Unset | None = UNSET,
+        url: str | Unset | None = UNSET,
+        organization: str | Unset | None = UNSET,
+        project: str | Unset | None = UNSET,
+        api_format: str | Unset | None = UNSET,
         transport: Transport | None = None,
         stream_transport: StreamTransport | None = None,
         timeout: float | None = None,
     ) -> None:
-        self.api_key = api_key if api_key is not None else os.environ.get("OPENAI_API_KEY", "")
-        self.url = (url or os.environ.get("OPENAI_URL") or DEFAULT_URL).rstrip("/")
-        self.organization = (
-            organization if organization is not None else os.environ.get("OPENAI_ORGANIZATION")
+        self.api_key = configured_string(api_key, "OPENAI_API_KEY", "", "")
+        self.url = configured_string(url, "OPENAI_URL", DEFAULT_URL).rstrip("/")
+        self.organization = nullable_string(organization, "OPENAI_ORGANIZATION")
+        self.project = nullable_string(project, "OPENAI_PROJECT")
+        self.api_format = configured_string(
+            api_format, "OPENAI_API_FORMAT", "responses", "responses"
         )
-        self.project = project if project is not None else os.environ.get("OPENAI_PROJECT")
-        self.api_format = api_format
         self.timeout = timeout
         self._transport: Transport = transport or UrllibTransport()
         self._stream_transport: StreamTransport = stream_transport or UrllibStreamTransport()
@@ -147,6 +147,7 @@ class OpenAI(Provider):
                 headers=headers,
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
@@ -201,6 +202,7 @@ class OpenAI(Provider):
                 headers=self._headers(len(body)),
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
@@ -225,6 +227,7 @@ class OpenAI(Provider):
                 headers=self._headers(len(body)),
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
@@ -249,6 +252,7 @@ class OpenAI(Provider):
                 headers=self._headers(len(body)),
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
@@ -284,6 +288,7 @@ class OpenAI(Provider):
                 headers=self._headers(len(body)),
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
@@ -316,6 +321,7 @@ class OpenAI(Provider):
                 headers=headers,
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
@@ -366,6 +372,7 @@ class OpenAI(Provider):
                 url=f"{self.url}/files/{quote(request.file_id, safe='')}/content",
                 headers=self._headers(0),
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
@@ -517,6 +524,7 @@ class OpenAI(Provider):
                 headers=headers,
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
@@ -564,6 +572,7 @@ class OpenAI(Provider):
                 headers=self._headers(len(body)),
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
