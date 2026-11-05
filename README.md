@@ -126,7 +126,8 @@ Pin the git URL, and leave a comment where you pin it — this is the kind of li
 a later tidy-up "corrects" into a version specifier.
 
 Configuration comes from explicit constructor arguments, falling back to
-`OPENAI_API_KEY`, `OPENAI_URL`, `OPENAI_ORGANIZATION` and `OPENAI_PROJECT`. The
+`OPENAI_API_KEY`, `OPENAI_URL`, `OPENAI_ORGANIZATION`, `OPENAI_PROJECT` and
+`OPENAI_API_FORMAT`. The
 HTTP transport is injectable, so nothing has to reach the network in a test:
 
 ```python
@@ -134,6 +135,60 @@ from prism import OpenAI, Prism
 
 pending = Prism.text().using("openai", "gpt-4o", {"transport": my_transport})
 ```
+
+An omitted constructor argument reads the environment, then the provider
+default. An explicit empty string stays empty. Explicit `None` follows the
+PHP reference's field-specific behavior:
+
+| Field | Explicit `None` |
+| --- | --- |
+| OpenAI `api_key` / `api_format` | `""` / `"responses"` |
+| OpenAI `organization` / `project`; Anthropic `beta_features` | Remains `None`; environment is ignored |
+| Anthropic `url` | Default Anthropic URL |
+| Anthropic `api_key` / `api_version`; OpenAI `url`; Mistral `api_key` / `url` | Refused with `TypeError` |
+
+Environment strings follow Laravel's reserved spellings: case-insensitive
+`null`, `true`, `false`, `empty` and their parenthesized forms become scalars;
+matching surrounding quotes are removed. Direct constructor strings remain
+literal. Non-string environment scalars are refused for string-only fields.
+Only OpenAI's Responses format is implemented; another format still raises
+`unsupported_provider_action` before HTTP.
+
+Anthropic reads `ANTHROPIC_API_KEY`, `ANTHROPIC_URL`, `ANTHROPIC_API_VERSION`
+and canonical `ANTHROPIC_BETA`. Legacy `ANTHROPIC_BETA_FEATURES` is consumed
+only when explicit `beta_features` and canonical `ANTHROPIC_BETA` are both
+absent, emitting one value-free `FutureWarning` per process. Explicit
+`None` or an empty canonical value prevents that fallback.
+
+`default_thinking_budget` overrides `ANTHROPIC_DEFAULT_THINKING_BUDGET`
+(default 1024). The configured scalar is cast as in PHP. An integer
+per-request thinking budget wins; booleans, strings and fractions in that
+per-request field use the configured fallback. No extra minimum is imposed.
+
+Request `client_options` supports only `timeout` and `connect_timeout`, in
+seconds, across JSON, stream and binary dispatch. Values must be finite,
+nonnegative numbers; zero disables the corresponding limit. Other keys are
+refused, so they cannot replace destinations, headers, redirect policy or body
+caps. These options also reach injected transports, which own their enforcement.
+
+The native urllib transport has a **30-second total nonstream deadline**
+covering DNS, connection, headers and body. Streams use **30 seconds through
+headers**, then Prism's **60-second idle limit per pending body read**, with no
+overall stream lifetime deadline. A request's `timeout` overrides the total or
+header budget; `connect_timeout` additionally bounds DNS/TCP/TLS connection.
+There is no Python `read_timeout` option. Closing a stream closes its response,
+including an iterator that was never started.
+
+An expired DNS wait returns promptly; its isolated daemon lookup can finish at
+the operating system's resolver timeout and holds no request payload or headers.
+HTTPS retains the original hostname for SNI and certificate verification.
+Guarded media validates and pins the same numeric addresses per redirect hop;
+this native pinned path bypasses environment proxies. A custom transport must
+honor `resolved_addresses`, `follow_redirects` and `max_body_bytes` to retain
+those protections.
+
+Mistral FIM now preserves response rate-limit headers through actual provider
+dispatch. Existing offset serialization differences remain recorded separately.
 
 ## Parity
 

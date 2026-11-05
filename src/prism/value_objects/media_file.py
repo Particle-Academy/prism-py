@@ -9,11 +9,24 @@ from pathlib import Path
 from typing import Any, ClassVar, cast
 from urllib.parse import urljoin, urlsplit
 
+from prism._http_deadline import NetworkDeadline, resolve_in_thread
 from prism.errors import ErrorCode, PrismError
 from prism.http import HttpRequest, Transport, UrllibTransport, fold_header_name
 from prism.public_url import DnsHostResolver, HostResolver, assert_public_url
 
 __all__ = ["Audio", "Document", "Image", "Media", "Video", "guess_mime_type"]
+
+
+class _DeadlineResolver:
+    def __init__(self, resolver: HostResolver, budget: NetworkDeadline) -> None:
+        self.resolver = resolver
+        self.budget = budget
+
+    def resolve(self, host: str) -> Sequence[str]:
+        return cast(
+            Sequence[str],
+            resolve_in_thread(self.resolver.resolve, (host,), self.budget.remaining()),
+        )
 
 
 class Media:
@@ -197,12 +210,15 @@ class Media:
         resolver: HostResolver | None = None,
         max_redirects: int = 5,
         max_bytes: int = 32 * 1024 * 1024,
+        timeout: float = 30.0,
     ) -> Media:
         """Explicit guarded fetch, checking every destination before HTTP.
 
         The transport must honor HttpRequest.follow_redirects=False. The default
-        urllib transport does so; each hop is validated here. DNS answers are
-        not pinned to the connection, so DNS rebinding remains possible.
+        urllib transport does so; each hop uses its validated numeric addresses
+        without a second DNS lookup. The default transport bypasses environment
+        proxies for this guarded path, preserving that address binding and TLS
+        hostname verification. Custom transports must honor resolved_addresses.
 
         BOUNDED (G-90): the answer is refused with ``media_too_large`` past
         ``max_bytes`` (default 32 MiB, the largest inline document the providers
@@ -219,12 +235,30 @@ class Media:
             raise ValueError("max_redirects must be a nonnegative integer.")
         if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 0:
             raise ValueError("max_bytes must be a nonnegative integer.")
+        # Reuse the native request's timeout validation; no client option can
+        # override this method's destination, redirects, headers or body cap.
+        validated_timeout = HttpRequest("GET", self.url, timeout=timeout).timeout
+        budget = NetworkDeadline(validated_timeout, validated_timeout)
         client = transport if transport is not None else UrllibTransport()
-        dns = resolver if resolver is not None else DnsHostResolver()
+        dns = _DeadlineResolver(resolver if resolver is not None else DnsHostResolver(), budget)
+        try:
+            return self._fetch_public(client, dns, budget, max_redirects, max_bytes)
+        finally:
+            budget.close()
+
+    def _fetch_public(
+        self,
+        client: Transport,
+        dns: HostResolver,
+        budget: NetworkDeadline,
+        max_redirects: int,
+        max_bytes: int,
+    ) -> Media:
+        assert self.url is not None
         url = self.url
         for hop in range(max_redirects + 1):
             try:
-                assert_public_url(url, dns)
+                addresses = assert_public_url(url, dns)
             except PrismError as error:
                 if hop and error.code in {
                     ErrorCode.SCHEME_NOT_ALLOWED,
@@ -237,8 +271,16 @@ class Media:
                     ) from None
                 raise
             response = client.send(
-                HttpRequest("GET", url, follow_redirects=False, max_body_bytes=max_bytes)
+                HttpRequest(
+                    "GET",
+                    url,
+                    timeout=budget.remaining() or 0,
+                    follow_redirects=False,
+                    max_body_bytes=max_bytes,
+                    resolved_addresses=addresses,
+                )
             )
+            budget.remaining()
             headers = {fold_header_name(key): value for key, value in response.headers.items()}
             location = headers.get("location")
             if 300 <= response.status < 400 and location:

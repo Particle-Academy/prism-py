@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Iterator
 from contextlib import closing
 from typing import Any
@@ -24,6 +23,13 @@ from prism.providers.anthropic.request_body import build_request_body, build_str
 from prism.providers.anthropic.response import parse_text_response
 from prism.providers.anthropic.stream_events import AnthropicStreamMapper
 from prism.providers.base import Provider
+from prism.providers.config import (
+    UNSET,
+    Unset,
+    anthropic_beta,
+    configured_string,
+    thinking_budget_default,
+)
 from prism.streaming.events import ErrorEvent, StreamEvent
 from prism.streaming.failure_usage import failure_aware_sse
 from prism.structured.from_text import structured_from_text_response
@@ -50,7 +56,8 @@ class Anthropic(Provider):
 
     Configuration comes from explicit constructor arguments, falling back to
     ``ANTHROPIC_API_KEY`` / ``ANTHROPIC_URL`` / ``ANTHROPIC_API_VERSION`` /
-    ``ANTHROPIC_BETA_FEATURES``.
+    ``ANTHROPIC_BETA``. The legacy ``ANTHROPIC_BETA_FEATURES`` fallback warns
+    only when consumed. Explicit ``None`` remains distinct from omission.
 
     ``transport`` is injectable so nothing here has to reach the network in a
     test.
@@ -58,30 +65,28 @@ class Anthropic(Provider):
 
     def __init__(
         self,
-        api_key: str | None = None,
-        url: str | None = None,
-        api_version: str | None = None,
-        beta_features: str | None = None,
+        api_key: str | Unset | None = UNSET,
+        url: str | Unset | None = UNSET,
+        api_version: str | Unset | None = UNSET,
+        beta_features: str | Unset | None = UNSET,
         transport: Transport | None = None,
         stream_transport: StreamTransport | None = None,
         timeout: float | None = None,
+        default_thinking_budget: Any = UNSET,
     ) -> None:
-        self.api_key = api_key if api_key is not None else os.environ.get("ANTHROPIC_API_KEY", "")
-        self.url = (url or os.environ.get("ANTHROPIC_URL") or DEFAULT_URL).rstrip("/")
-        self.api_version = (
-            api_version or os.environ.get("ANTHROPIC_API_VERSION") or DEFAULT_API_VERSION
+        self.api_key = configured_string(api_key, "ANTHROPIC_API_KEY", "")
+        self.url = configured_string(url, "ANTHROPIC_URL", DEFAULT_URL, DEFAULT_URL).rstrip("/")
+        self.api_version = configured_string(
+            api_version, "ANTHROPIC_API_VERSION", DEFAULT_API_VERSION
         )
-        self.beta_features = (
-            beta_features
-            if beta_features is not None
-            else os.environ.get("ANTHROPIC_BETA_FEATURES")
-        )
+        self.beta_features = anthropic_beta(beta_features)
+        self.default_thinking_budget = thinking_budget_default(default_thinking_budget)
         self.timeout = timeout
         self._transport: Transport = transport or UrllibTransport()
         self._stream_transport: StreamTransport = stream_transport or UrllibStreamTransport()
 
     def text(self, request: Request) -> Response:
-        return self._send(request, build_request_body(request))
+        return self._send(request, build_request_body(request, self.default_thinking_budget))
 
     def _send(self, request: Request, payload: dict[str, Any]) -> Response:
         body = canonical.encode(payload).encode("utf-8")
@@ -92,6 +97,7 @@ class Anthropic(Provider):
                 headers=self._headers(len(body)),
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
@@ -116,7 +122,7 @@ class Anthropic(Provider):
         which is the kind of bug that only appears under load and looks like the
         model hallucinating.
         """
-        payload = {**build_request_body(request), "stream": True}
+        payload = {**build_request_body(request, self.default_thinking_budget), "stream": True}
         body = canonical.encode(payload).encode("utf-8")
         headers = {**self._headers(len(body)), "Accept": "text/event-stream"}
 
@@ -127,6 +133,7 @@ class Anthropic(Provider):
                 headers=headers,
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
@@ -163,7 +170,8 @@ class Anthropic(Provider):
     def structured(self, request: StructuredRequest) -> StructuredResponse:
         """Structured output through Anthropic's native output_config.format."""
         return structured_from_text_response(
-            self._send(request, build_structured_body(request)), native_output_format=True
+            self._send(request, build_structured_body(request, self.default_thinking_budget)),
+            native_output_format=True,
         )
 
     # -- internals ---------------------------------------------------------

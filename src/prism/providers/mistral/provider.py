@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Iterator
 from contextlib import closing
 from typing import Any
@@ -27,6 +26,7 @@ from prism.http import (
     encode_multipart,
 )
 from prism.providers.base import Provider
+from prism.providers.config import UNSET, Unset, configured_string
 from prism.providers.mistral.embeddings import build_embeddings_body, parse_embeddings_response
 from prism.providers.mistral.fim import parse_fim_response
 from prism.providers.mistral.rate_limits import parse_rate_limits
@@ -75,26 +75,30 @@ class Mistral(Provider):
 
     def __init__(
         self,
-        api_key: str | None = None,
-        url: str | None = None,
+        api_key: str | Unset | None = UNSET,
+        url: str | Unset | None = UNSET,
         transport: Transport | None = None,
         stream_transport: StreamTransport | None = None,
         timeout: float | None = None,
     ) -> None:
-        self.api_key = api_key if api_key is not None else os.environ.get("MISTRAL_API_KEY", "")
-        self.url = (url or os.environ.get("MISTRAL_URL") or DEFAULT_URL).rstrip("/")
+        self.api_key = configured_string(api_key, "MISTRAL_API_KEY", "")
+        self.url = configured_string(url, "MISTRAL_URL", DEFAULT_URL).rstrip("/")
         self.timeout = timeout
         self._transport: Transport = transport or UrllibTransport()
         self._stream_transport: StreamTransport = stream_transport or UrllibStreamTransport()
 
     def text(self, request: Request) -> Response:
-        decoded, headers = self._send("chat/completions", build_request_body(request))
+        decoded, headers = self._send(
+            "chat/completions", build_request_body(request), request.client_options
+        )
 
         return parse_text_response(request, decoded, parse_rate_limits(headers))
 
     def structured(self, request: StructuredRequest) -> StructuredResponse:
         """Structured output through Mistral's JSON schema response format."""
-        decoded, headers = self._send("chat/completions", build_structured_body(request))
+        decoded, headers = self._send(
+            "chat/completions", build_structured_body(request), request.client_options
+        )
 
         return structured_from_text_response(
             parse_text_response(request, decoded, parse_rate_limits(headers)),
@@ -108,10 +112,15 @@ class Mistral(Provider):
         takes a prompt and a suffix and has no messages at all. That is why the
         capability has its own builder rather than a flag on the text one.
         """
-        return parse_fim_response(self._post("fim/completions", build_fim_body(request)), request)
+        decoded, headers = self._send(
+            "fim/completions", build_fim_body(request), request.client_options
+        )
+        return parse_fim_response(decoded, request, parse_rate_limits(headers))
 
     def embeddings(self, request: EmbeddingsRequest) -> EmbeddingsResponse:
-        return parse_embeddings_response(self._post("embeddings", build_embeddings_body(request)))
+        return parse_embeddings_response(
+            self._post("embeddings", build_embeddings_body(request), request.client_options)
+        )
 
     def speech_to_text(self, request: SpeechToTextRequest) -> AudioTextResponse:
         """Transcription, sharing the OpenAI multipart form.
@@ -132,6 +141,7 @@ class Mistral(Provider):
                 headers=headers,
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
@@ -164,6 +174,7 @@ class Mistral(Provider):
                 headers=headers,
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
             )
         )
 
@@ -206,11 +217,15 @@ class Mistral(Provider):
 
     # -- internals ---------------------------------------------------------
 
-    def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def _post(
+        self, path: str, payload: dict[str, Any], client_options: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """The body alone, for the paths that carry no quota metadata."""
-        return self._send(path, payload)[0]
+        return self._send(path, payload, client_options)[0]
 
-    def _send(self, path: str, payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
+    def _send(
+        self, path: str, payload: dict[str, Any], client_options: dict[str, Any] | None = None
+    ) -> tuple[dict[str, Any], dict[str, str]]:
         """The decoded body AND the response headers.
 
         Two methods rather than one returning a tuple everywhere: only the text
@@ -227,6 +242,7 @@ class Mistral(Provider):
                 headers=self._headers(len(body)),
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=client_options if client_options is not None else {},
             )
         )
 

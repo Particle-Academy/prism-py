@@ -27,6 +27,9 @@ class ChunkResponse:
             return chunk[:size]
         return chunk
 
+    def read1(self, size: int) -> bytes:
+        return self.read(size)
+
     def close(self) -> None:
         pass
 
@@ -57,7 +60,15 @@ def parse_stream(case: dict[str, Any]) -> dict[str, Any]:
     event_ids: dict[str, str] = {}
     opaque_ids: dict[str, str] = {}
     terminal = {"status": "returned"}
-    with patch("urllib.request.urlopen", side_effect=open_owned):
+    # urlopen and per-request openers both pass through this native boundary.
+    # A future transport change must fail, never escape this owned fixture.
+    with (
+        patch("urllib.request.OpenerDirector.open", side_effect=open_owned),
+        patch("socket.getaddrinfo", side_effect=AssertionError("Unowned DNS in stream fixture.")),
+        patch(
+            "socket.socket.connect", side_effect=AssertionError("Unowned socket in stream fixture.")
+        ),
+    ):
         try:
             for event in Anthropic(api_key="owned-g115", url="https://api.anthropic.com/v1").stream(
                 pending.to_request()

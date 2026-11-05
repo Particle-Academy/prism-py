@@ -1,4 +1,4 @@
-"""Validate media destinations before sending; DNS is not connection-pinned."""
+"""Validate and return the numeric addresses a guarded transport must use."""
 
 from __future__ import annotations
 
@@ -92,8 +92,8 @@ def _assert_public_address(address: str) -> None:
         )
 
 
-def assert_public_url(url: str, resolver: HostResolver) -> None:
-    """Check scheme, literal and all DNS answers; rebinding remains possible."""
+def assert_public_url(url: str, resolver: HostResolver) -> tuple[str, ...]:
+    """Check scheme, literal and every DNS answer before pinning the connection."""
     try:
         if not re.match(r"^https?://", url, re.IGNORECASE):
             raise ValueError("Not an absolute HTTP URL")
@@ -115,7 +115,7 @@ def assert_public_url(url: str, resolver: HostResolver) -> None:
         try:
             literal = socket.inet_ntoa(socket.inet_aton(host))
         except OSError:
-            addresses = resolver.resolve(host)
+            addresses = tuple(resolver.resolve(host))
             if not addresses:
                 raise PrismError(
                     ErrorCode.HOST_DID_NOT_RESOLVE,
@@ -123,7 +123,10 @@ def assert_public_url(url: str, resolver: HostResolver) -> None:
                 ) from None
             for address in addresses:
                 _assert_public_address(address)
+            return addresses
         else:
             _assert_public_address(literal)
+            return (literal,)
     else:
         _assert_public_address(host)
+        return (host,)

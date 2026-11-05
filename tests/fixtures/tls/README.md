@@ -1,0 +1,1 @@
+Synthetic, public test certificate and matching nonsecret key for owned loopback TLS controls only. Trust is supplied only in the test. Native CERT_REQUIRED and hostname verification remain enabled; wrong.test must be rejected for the fixture.test certificate. Never use this public key pair in production.
