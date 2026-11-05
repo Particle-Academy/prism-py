@@ -135,6 +135,8 @@ def test_guard_connects_only_to_its_single_validated_answer(
 def test_tls_keeps_original_sni_and_rejects_wrong_hostname(monkeypatch: pytest.MonkeyPatch) -> None:
     fixture = Path(__file__).parent / "fixtures/tls"
     server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    server_context.minimum_version = ssl.TLSVersion.TLSv1_2
+    assert server_context.minimum_version == ssl.TLSVersion.TLSv1_2
     server_context.load_cert_chain(fixture / "fixture.crt", fixture / "fixture.key")
     names: list[str | None] = []
     server_context.set_servername_callback(lambda _socket, name, _context: names.append(name))
