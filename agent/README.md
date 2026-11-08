@@ -1,65 +1,24 @@
-# prism.py — the Python member of the Prism agent team
+# prism.py — the local contributor agent
 
-An MCP server that reasons **through this port**.
+This loopback MCP server exposes source discovery, test and conformance tools for this port. Its paid `explain` and `consensus` tools currently refuse every call with typed `paid_call_not_authorised`, before a provider builder can run. A provider key, owner label, approval flag or caller-supplied run ID grants no authority. G246 tracks the future reviewed cross-process run-authority contract.
 
-That is the point rather than an implementation detail. An agent built on
-prism-py is this port's most demanding consumer, and every defect it trips
-over is one a user would have tripped over. An agent that reasoned through
-some other SDK would test nothing.
+## Run
 
-## Running it
-
-```bash
-python agent/server.py   # listens on 127.0.0.1:7412
-```
-
-Reasoning needs `OPENAI_API_KEY`. Without it `status` reports
-`can_reason: false` and `explain` says so plainly rather than calling with an
-empty bearer token.
-
-| Variable | Default |
-|---|---|
-| `PRISM_AGENT_PORT` | `7412` |
-| `PRISM_AGENT_PROVIDER` | `openai` |
-| `PRISM_AGENT_MODEL` | `gpt-4.1-mini` |
-| `PRISM_AGENT_RUN_TIMEOUT` | `300` (seconds) |
+Run `python agent/server.py`. The agent uses the source package beside it. The default listener is `127.0.0.1:7412`, configurable with `PRISM_AGENT_PORT`. Provider/model reporting follows the source defaults (Anthropic/claude-sonnet-4-5) and `PRISM_AGENT_PROVIDER`/`PRISM_AGENT_MODEL`.
 
 ## Tools
 
-| Tool | Cost | Returns |
-|---|---|---|
-| `status` | free | language, port version, model, whether it can reason |
-| `run_conformance` | cheap | the conformance **report document, unchanged** |
-| `run_tests` | cheap | pass/fail and the tail of the output |
-| `explain` | **billable** | model-written analysis of one named failure |
+| Tool | Behavior |
+| --- | --- |
+| status | Free; provider key presence is separate from authority. can_reason is false with paid_call_refusal. |
+| describe_port | Free source/provider/capability discovery. |
+| harness_probe | Free native harness probe. |
+| ecosystem_probe | Free satellite security probes. |
+| run_conformance | Executes the existing corpus and returns its report. |
+| run_tests | Executes the local test suite with its existing bound. |
+| explain | Typed paid_call_not_authorised refusal; no provider call. |
+| consensus | Typed paid_call_not_authorised refusal; no provider call. |
 
-Same four tools, same names and shapes, as every other language agent. A
-roster where each member answers a different vocabulary is not a team.
+The MCP result has `isError: true` and identical structured/text refusal data: `{ok:false,code:"paid_call_not_authorised",reason:"…"}`. Discovery and free probes remain available. No approval, GO, launch, impersonation or authentication transport is added. Published SDK runtime code is unchanged; this contributor agent directory is excluded from the package archive.
 
-`run_conformance` returns the corpus report exactly as the runner emits it.
-The cross-language contract is versioned and shared; reshaping it here is the
-drift `prism-parity` exists to prevent.
-
-## Protocol
-
-MCP `2026-07-28` over HTTP — `server/discover`, `tools/list`, `tools/call`.
-That revision removed `initialize` and the session, so there is no handshake.
-
-Standard library only, like the package it lives in.
-
-## Why loopback only
-
-This agent runs the test suite and spends tokens. That is remote code
-execution wearing a friendly name, and it has no business being reachable
-from anywhere but this machine.
-
-## Why it is not on Claude
-
-`PRISM_AGENT_PROVIDER` is checked against what this port can actually route to,
-and today that is **OpenAI only**. Pointing it at `anthropic` makes `status`
-report `provider_available: false` and `explain` refuse by name, rather than
-sending a Claude model id to OpenAI and failing at the API with an error about
-the model — the confusing kind, that sends you looking in the wrong place.
-
-Moving this agent to Claude is not a setting. It needs an Anthropic provider
-in the port itself, and then it is a setting.
+MCP `2026-07-28` over HTTP supports `server/discover`, `tools/list` and `tools/call`, with no initialize/session handshake. The Python standard library provides the transport. Keep the listener on loopback: its local test and conformance capabilities execute code.

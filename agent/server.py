@@ -17,7 +17,7 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from agent import LANGUAGE, TOOLS
+from agent import LANGUAGE, TOOLS, PaidCallNotAuthorisedError
 
 PROTOCOL_VERSION = "2026-07-28"
 PORT = int(os.environ.get("PRISM_AGENT_PORT", "7412"))
@@ -69,6 +69,13 @@ def dispatch(method: str | None, params: dict[str, Any] | None) -> dict[str, Any
 
         try:
             result = tool["handler"]((params or {}).get("arguments") or {})
+        except PaidCallNotAuthorisedError as error:
+            refusal = {"ok": False, "code": error.code, "reason": str(error)}
+            return {
+                "content": [{"type": "text", "text": json.dumps(refusal)}],
+                "structuredContent": refusal,
+                "isError": True,
+            }
         except Exception as error:
             # A tool that fails returns isError on the RESULT, not a JSON-RPC
             # error. The distinction matters: the call succeeded, the work did
