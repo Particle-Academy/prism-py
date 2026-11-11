@@ -25,6 +25,7 @@ class ErrorCode(str, Enum):
     PROVIDER_RESPONSE_ERROR = "provider_response_error"
     UNSUPPORTED_PROVIDER_ACTION = "unsupported_provider_action"
     MALFORMED_TOOL_CALL_ARGUMENTS = "malformed_tool_call_arguments"
+    INVALID_TOOL_SCHEMA = "invalid_tool_schema"
     UNKNOWN_MESSAGE_TYPE = "unknown_message_type"
     TOOL_LOOP_NOT_SUPPORTED = "tool_loop_not_supported"
     MISSING_SCHEMA = "missing_schema"

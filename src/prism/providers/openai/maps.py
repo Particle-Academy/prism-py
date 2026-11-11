@@ -244,12 +244,8 @@ def map_tools(tools: Sequence[Tool]) -> list[dict[str, Any]]:
             "description": tool.description,
         }
 
-        if tool.has_parameters():
-            declaration["parameters"] = {
-                "type": "object",
-                "properties": tool.parameters_as_dict(),
-                "required": tool.required_parameters,
-            }
+        if tool.has_parameters() or bool(tool.provider_option("strict")):
+            declaration["parameters"] = tool.parameters_as_schema(require_all_properties=True)
 
         declaration["strict"] = bool(tool.provider_option("strict"))
 
