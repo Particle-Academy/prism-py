@@ -200,11 +200,8 @@ def map_tools(tools: Sequence[Tool]) -> list[dict[str, Any]]:
         {
             "name": tool.name,
             "description": tool.description,
-            "input_schema": {
-                "type": "object",
-                "properties": tool.parameters_as_dict() if tool.has_parameters() else {},
-                "required": list(tool.required_parameters),
-            },
+            "input_schema": tool.parameters_as_schema(),
+            **({"strict": True} if tool.provider_option("strict") else {}),
         }
         for tool in tools
     ]

@@ -71,6 +71,14 @@ calls is refused with `tool_loop_not_supported` rather than half-executed — an
 the fifteen providers the reference has and this one does not. An unsupported
 capability raises a coded error rather than a missing attribute.
 
+Tools with `.with_provider_options({"strict": True})` send a closed root object
+schema for OpenAI Responses and Anthropic, including tools without parameters.
+OpenAI requires every root parameter to be required; an optional root field
+raises `PrismError` with code `invalid_tool_schema` before HTTP. Make that field
+required (and nullable if needed), or turn strict off. Anthropic retains declared
+optional fields. Nested schemas remain exactly as declared: callers must make
+those schemas valid for their provider. Mistral's mapping is unchanged.
+
 Structured responses retain `structured`, `steps`, `raw`, and the tool carrier
 tuples when serialized with `to_dict()`. Each `StructuredStep`, exported from
 `prism.structured`, retains its completed `messages` and per-step parsed value.

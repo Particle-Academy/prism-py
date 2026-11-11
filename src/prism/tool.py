@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from prism._php import data_get
+from prism.errors import ErrorCode, PrismError
 from prism.schema import BooleanSchema, NumberSchema, Schema, StringSchema
 
 __all__ = ["Tool"]
@@ -77,6 +78,26 @@ class Tool:
 
     def parameters_as_dict(self) -> dict[str, Any]:
         return {name: schema.to_dict() for name, schema in self._parameters.items()}
+
+    def parameters_as_schema(self, require_all_properties: bool = False) -> dict[str, Any]:
+        """Close the generated root without rewriting caller-owned nested schemas."""
+        strict = bool(self.provider_option("strict"))
+        if strict and require_all_properties:
+            optional = [name for name in self._parameters if name not in self._required_parameters]
+            if optional:
+                raise PrismError(
+                    ErrorCode.INVALID_TOOL_SCHEMA,
+                    f"Strict tool [{self.name}] has optional parameters [{', '.join(optional)}]. "
+                    "This provider requires every property to be required. "
+                    "Make them required (nullable if needed) or turn strict off.",
+                )
+
+        return {
+            "type": "object",
+            "properties": self.parameters_as_dict(),
+            "required": list(self._required_parameters),
+            **({"additionalProperties": False} if strict else {}),
+        }
 
     def provider_option(self, path: str | None = None, default: Any = None) -> Any:
         if path is None:
