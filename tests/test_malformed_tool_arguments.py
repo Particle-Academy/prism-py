@@ -219,3 +219,55 @@ def test_classifies_arguments(arguments: str, malformed: bool) -> None:
 
     assert hasattr(call, "has_malformed_arguments")
     assert call.has_malformed_arguments() is malformed
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    ["5", '"x"', "true", "false", "[1,2]", '{"0":"x"}', MALFORMED, {"0": "x"}],
+)
+def test_decoded_arguments_refuses_anything_but_named_values(arguments: Any) -> None:
+    returned: Any = "nothing returned"
+    code: Any = None
+
+    try:
+        returned = ToolCall("c", "weather", arguments).decoded_arguments()
+    except PrismError as error:
+        code = error.code
+
+    assert returned == "nothing returned"
+    assert code == "malformed_tool_call_arguments"
+
+
+@pytest.mark.parametrize("arguments", ["", "0", "null", "[]", "{}"])
+def test_decoded_arguments_still_reads_no_arguments(arguments: str) -> None:
+    assert ToolCall("c", "weather", arguments).decoded_arguments() == {}
+
+
+@pytest.mark.parametrize("provider", ["openai", "anthropic"])
+def test_refuses_an_unanswered_non_object_call_at_mapping(provider: str) -> None:
+    transport = RecordingTransport(provider)
+    pending = (
+        Prism.text()
+        .using(provider, "m", {"transport": transport})
+        .with_messages(
+            [
+                UserMessage("Weather?"),
+                AssistantMessage("", [ToolCall("call_1", "weather", "5", "call_1")]),
+            ]
+        )
+    )
+
+    assert "not a JSON object" in (_failure_of(pending) or "")
+    assert transport.sent is None
+
+
+@pytest.mark.parametrize("provider", ["openai", "anthropic", "mistral"])
+def test_still_replays_an_answered_non_object_call_empty(provider: str) -> None:
+    transport = RecordingTransport(provider)
+    pending = (
+        Prism.text().using(provider, "m", {"transport": transport}).with_messages(_answered("5"))
+    )
+
+    assert _failure_of(pending) is None
+    sent = _replayed(provider, transport)
+    assert (json.loads(sent) if isinstance(sent, str) else sent) == {}

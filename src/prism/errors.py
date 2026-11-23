@@ -136,6 +136,13 @@ class PrismError(Exception):
         )
 
     @classmethod
+    def tool_call_arguments_not_an_object(cls, tool_name: str) -> PrismError:
+        return cls(
+            ErrorCode.MALFORMED_TOOL_CALL_ARGUMENTS,
+            f"Tool call arguments for tool {tool_name} are not a JSON object.",
+        )
+
+    @classmethod
     def unsupported_media(cls, provider: str, part: str, accepts: str) -> PrismError:
         """Names the provider, the part, and WHAT IT WOULD ACCEPT.
 

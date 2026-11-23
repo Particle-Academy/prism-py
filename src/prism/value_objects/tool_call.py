@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from prism.errors import PrismError
+from prism.errors import ErrorCode, PrismError
 
 __all__ = ["ToolCall"]
 
@@ -43,46 +43,46 @@ class ToolCall:
     def decoded_arguments(self) -> dict[str, Any]:
         """The arguments as a mapping, decoding the string form if needed.
 
-        :raises PrismError: with code ``malformed_tool_call_arguments`` when the
-            string form cannot be decoded. Failing here, at mapping time, is the
-            point: the alternative is a malformed function call reaching the
-            provider.
-        """
-        if not isinstance(self.arguments, str):
-            return self.arguments
+        A JSON ``null`` and an empty list mean none were given. Anything else
+        that is not a map of named values is refused rather than read as no
+        arguments, so a tool is never run on an empty mapping the model did not
+        send.
 
+        :raises PrismError: with code ``malformed_tool_call_arguments`` when the
+            arguments cannot be decoded or are not named values. Failing here,
+            at mapping time, is the point: the alternative is a malformed
+            function call reaching the provider.
+        """
         # PHP treats "0" as falsy and the reference short-circuits on it; both
         # it and the empty string decode to no arguments rather than failing.
-        if self.arguments in ("", "0"):
+        if isinstance(self.arguments, str) and self.arguments in ("", "0"):
             return {}
 
-        decoded = self._decode(self.arguments)
-
-        return decoded if isinstance(decoded, dict) else {}
-
-    def has_malformed_arguments(self) -> bool:
-        """Whether the arguments are unusable: not JSON, or not named values.
-
-        A JSON ``null``, an empty list and an empty string all mean none were
-        given. Integer-like keys count as unusable because the reference binds
-        them to a handler by position, and all three languages classify a call
-        the same way.
-        """
-        if self.arguments in ("", "0"):
-            return False
-
-        decoded: Any = self.arguments
-
-        if isinstance(self.arguments, str):
-            try:
-                decoded = self._decode(self.arguments)
-            except PrismError:
-                return True
+        decoded: Any = (
+            self._decode(self.arguments) if isinstance(self.arguments, str) else self.arguments
+        )
 
         if decoded is None or decoded == []:
-            return False
+            return {}
 
-        return not isinstance(decoded, dict) or any(_is_integer_key(key) for key in decoded)
+        # Integer-like keys are refused because the reference binds them to a
+        # handler by position, and all three languages classify a call the same
+        # way.
+        if not isinstance(decoded, dict) or any(_is_integer_key(key) for key in decoded):
+            raise PrismError.tool_call_arguments_not_an_object(self.name)
+
+        return decoded
+
+    def has_malformed_arguments(self) -> bool:
+        """Whether :meth:`decoded_arguments` would refuse these arguments."""
+        try:
+            self.decoded_arguments()
+        except PrismError as error:
+            if error.code == ErrorCode.MALFORMED_TOOL_CALL_ARGUMENTS:
+                return True
+            raise
+
+        return False
 
     def without_malformed_arguments(self) -> ToolCall:
         """This call with unusable arguments replaced by none."""
