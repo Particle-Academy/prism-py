@@ -268,11 +268,12 @@ def test_replacing_a_built_in_explicitly_is_allowed() -> None:
     assert resolve_provider("openai") is replacement
 
 
-# A provider name a human cannot read correctly is refused, not trimmed. The
-# rule is spelled identically in the reference and prism-ts: non-empty, and no
-# whitespace, control (Cc) or format (Cf) character, nor any codepoint of the
-# G-36 set the human-plus confirmation guard normalises. Codepoints are written
-# with chr() so the test says exactly which character it sends.
+# A provider name is a positive ASCII allow-list,
+# ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$, spelled identically in the reference and
+# prism-ts. It replaces a forbidden-character test that relied on each
+# language's Unicode tables. Look-alikes, padding and invisible codepoints are
+# refused, never trimmed or folded. Codepoints are written with chr() so the
+# test says exactly which character it sends.
 UNREADABLE_NAMES = {
     "empty": "",
     "leading space": " openai",
@@ -292,6 +293,16 @@ UNREADABLE_NAMES = {
     "word joiner (Cf, outside G-36)": "openai" + chr(0x2060),
     "soft hyphen (Cf)": "open" + chr(0xAD) + "ai",
     "lone surrogate": "openai" + chr(0xD800),
+    "Cyrillic o homoglyph": chr(0x043E) + "penai",
+    "Cyrillic a homoglyph": "open" + chr(0x0430) + "i",
+    "full-width": "".join(chr(c) for c in (0xFF4F, 0xFF50, 0xFF45, 0xFF4E, 0xFF41, 0xFF49)),
+    "Latin-1 letter": "caf" + chr(0xE9),
+    "leading hyphen": "-openai",
+    "leading dot": ".openai",
+    "leading underscore": "_openai",
+    "colon": "acme:edge",
+    "slash": "acme/edge",
+    "65 characters": "a" * 65,
 }
 
 
@@ -310,9 +321,92 @@ def test_refuses_a_provider_name_that_is_empty_or_carries_an_invisible_character
 
 
 @pytest.mark.parametrize(
-    "name", ["credential-scope-plain", "my_provider.v2", "acme:edge", "caf" + chr(0xE9)]
+    "name", ["credential-scope-plain", "my_provider.v2", "0day", "q", "b" * 64]
 )
 def test_still_accepts_an_ordinary_custom_provider_name(name: str) -> None:
     replacement = _Stub()
     register_provider(name, lambda **_: replacement)
     assert resolve_provider(name) is replacement
+
+
+@pytest.mark.parametrize("name", sorted(BUILT_INS))
+def test_the_built_in_names_pass_the_allow_list(name: str) -> None:
+    # A built-in name reaches the collision check, so the name itself is valid.
+    with pytest.raises(ValueError, match="already registered"):
+        register_provider(name, _Stub)
+    register_provider(name, _Stub, replace=True)
+
+
+# A url carrying whitespace or a control character anywhere is refused before
+# any request, whether it is passed per call or configured in the environment.
+# The forbidden set is spelled by codepoint, identically in the reference and
+# prism-ts: every Cc control (U+0000..U+001F, U+007F..U+009F), every Unicode
+# White_Space codepoint, and the G-36 zero-widths U+200B..U+200D and U+FEFF.
+# The error names neither the url nor the key.
+DIRTY_URLS = {
+    "padded both ends (cs-0016)": " https://api.openai.com/v1 ",
+    "leading space": " https://api.openai.com/v1",
+    "trailing space": "https://api.openai.com/v1 ",
+    "interior space": "https://api.openai.com/v1 x",
+    "tab": "https://api.openai.com/v1" + chr(0x09),
+    "newline": "https://api.openai.com/v1" + chr(0x0A),
+    "carriage return": chr(0x0D) + "https://api.openai.com/v1",
+    "NUL": "https://api.openai.com" + chr(0x00) + "/v1",
+    "DEL": "https://api.openai.com/v1" + chr(0x7F),
+    "C1 control": "https://api.openai.com/v1" + chr(0x9B),
+    "NEL": "https://api.openai.com/v1" + chr(0x85),
+    "no-break space": chr(0xA0) + "https://api.openai.com/v1",
+    "ideographic space": "https://api.openai.com/v1" + chr(0x3000),
+    "zero-width space": "https://api.openai.com" + chr(0x200B) + "/v1",
+    "BOM prefix": chr(0xFEFF) + "https://api.openai.com/v1",
+}
+
+URL_REFUSAL = "url must not contain whitespace or control characters"
+
+
+def attempt(name: str, config: dict[str, Any]) -> BaseException | None:
+    try:
+        Prism.text().using(name, "fixture-model", config).with_prompt("hi").as_text()
+    except Exception as error:  # noqa: BLE001 - the refusal is what is under test
+        return error
+    return None
+
+
+@pytest.mark.parametrize("spec", PROVIDERS, ids=lambda spec: spec.name)
+@pytest.mark.parametrize("url", list(DIRTY_URLS.values()), ids=list(DIRTY_URLS))
+def test_refuses_a_per_call_url_with_whitespace_or_controls_before_any_request(
+    spec: Spec, url: str, sent: list[Sent], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(spec.key_env, f"env-secret-{spec.name}")
+    error = attempt(spec.name, {"url": url})
+    assert sent == []
+    assert isinstance(error, ValueError)
+    assert URL_REFUSAL in str(error)
+    assert "openai.com" not in str(error)
+    assert f"env-secret-{spec.name}" not in str(error)
+
+
+@pytest.mark.parametrize("spec", PROVIDERS, ids=lambda spec: spec.name)
+def test_refuses_an_environment_url_with_a_trailing_newline_before_any_request(
+    spec: Spec, sent: list[Sent], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(spec.key_env, f"env-secret-{spec.name}")
+    monkeypatch.setenv(spec.url_env, "https://gateway.example/v1" + chr(0x0A))
+    error = attempt(spec.name, {})
+    assert sent == []
+    assert isinstance(error, ValueError)
+    assert URL_REFUSAL in str(error)
+    assert "gateway.example" not in str(error)
+
+
+def test_refuses_a_padded_url_before_a_custom_factory_runs() -> None:
+    called: list[bool] = []
+
+    def factory(**_: Any) -> Provider:
+        called.append(True)
+        return _Stub()
+
+    register_provider("credential-scope-padded", factory)
+    with pytest.raises(ValueError, match=URL_REFUSAL):
+        resolve_provider("credential-scope-padded", {"url": " https://configured.example/v1"})
+    assert called == []
