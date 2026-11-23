@@ -26,6 +26,7 @@ from prism.value_objects.messages import (
     ToolResultMessage,
     UserMessage,
 )
+from prism.value_objects.replayable_messages import replayable_messages
 
 __all__ = [
     "map_finish_reason",
@@ -68,7 +69,7 @@ def map_messages(
     """
     mapped: list[dict[str, Any]] = []
 
-    for message in [*system_prompts, *messages]:
+    for message in [*system_prompts, *replayable_messages(messages)]:
         mapped.extend(_map_message(message))
 
     return mapped

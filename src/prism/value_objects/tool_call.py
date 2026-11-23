@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from prism.errors import PrismError
 
 __all__ = ["ToolCall"]
+
+_INTEGER_KEY = re.compile(r"0|-?[1-9][0-9]*", re.ASCII)
 
 _CONTROL_ESCAPES = {
     "\x08": "\\b",
@@ -53,19 +56,53 @@ class ToolCall:
         if self.arguments in ("", "0"):
             return {}
 
+        decoded = self._decode(self.arguments)
+
+        return decoded if isinstance(decoded, dict) else {}
+
+    def has_malformed_arguments(self) -> bool:
+        """Whether the arguments are unusable: not JSON, or not named values.
+
+        A JSON ``null``, an empty list and an empty string all mean none were
+        given. Integer-like keys count as unusable because the reference binds
+        them to a handler by position, and all three languages classify a call
+        the same way.
+        """
+        if self.arguments in ("", "0"):
+            return False
+
+        decoded: Any = self.arguments
+
+        if isinstance(self.arguments, str):
+            try:
+                decoded = self._decode(self.arguments)
+            except PrismError:
+                return True
+
+        if decoded is None or decoded == []:
+            return False
+
+        return not isinstance(decoded, dict) or any(_is_integer_key(key) for key in decoded)
+
+    def without_malformed_arguments(self) -> ToolCall:
+        """This call with unusable arguments replaced by none."""
+        if not self.has_malformed_arguments():
+            return self
+
+        return replace(self, arguments={})
+
+    def _decode(self, text: str) -> Any:
         try:
-            decoded = json.loads(self.arguments)
+            return json.loads(text)
         except ValueError:
             # Some providers (DeepSeek when streaming, notably) emit raw control
             # characters inside string values, which RFC 8259 requires to be
             # escaped. Escape them in place — stripping them would corrupt
             # intentional newlines and tabs — and decode again.
             try:
-                decoded = json.loads(_escape_control_characters_in_strings(self.arguments))
+                return json.loads(_escape_control_characters_in_strings(text))
             except ValueError as exc:
                 raise PrismError.malformed_tool_call_arguments(self.name) from exc
-
-        return decoded if isinstance(decoded, dict) else {}
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -87,6 +124,14 @@ class ToolCall:
             reasoning_id=data.get("reasoning_id"),
             reasoning_summary=data.get("reasoning_summary"),
         )
+
+
+def _is_integer_key(key: object) -> bool:
+    """A key PHP would store as an integer: canonical decimal, within 64 bits."""
+    if not isinstance(key, str) or _INTEGER_KEY.fullmatch(key) is None:
+        return False
+
+    return -(2**63) <= int(key) <= 2**63 - 1
 
 
 def _escape_control_characters_in_strings(raw: str) -> str:

@@ -20,6 +20,7 @@ from prism.value_objects.messages import (
     ToolResultMessage,
     UserMessage,
 )
+from prism.value_objects.replayable_messages import replayable_messages
 
 __all__ = [
     "map_finish_reason",
@@ -81,7 +82,7 @@ def map_messages(messages: Sequence[Message]) -> list[dict[str, Any]]:
     """
     items: list[dict[str, Any]] = []
 
-    for message in messages:
+    for message in replayable_messages(messages):
         if isinstance(message, SystemMessage):
             # Reaching here means a system message was passed as a MESSAGE.
             # Anthropic has no system role, and silently demoting it to a user

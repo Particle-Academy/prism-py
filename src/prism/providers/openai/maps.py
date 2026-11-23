@@ -22,6 +22,8 @@ from prism.value_objects import (
     UserMessage,
 )
 from prism.value_objects.media_file import Document, Image
+from prism.value_objects.replayable_messages import replayable_messages
+from prism.value_objects.tool_call import ToolCall as _ToolCall
 
 __all__ = [
     "map_finish_reason",
@@ -52,7 +54,7 @@ def map_messages(
     """
     mapped: list[dict[str, Any]] = []
 
-    for message in [*system_prompts, *messages]:
+    for message in [*system_prompts, *replayable_messages(messages)]:
         if isinstance(message, UserMessage):
             mapped.append(_map_user_message(message))
         elif isinstance(message, AssistantMessage):
@@ -143,7 +145,15 @@ def _map_document(document: Document) -> dict[str, Any]:
 def _map_assistant_message(message: AssistantMessage) -> list[dict[str, Any]]:
     replay = message.additional_content.get("output_items")
     if isinstance(replay, list) and replay:
-        return replayable_items(replay)
+        # The same replay every other path sends for unusable arguments.
+        return [
+            {**item, "arguments": "{}"}
+            if item.get("type") == "function_call"
+            and isinstance(item.get("arguments"), str)
+            and _ToolCall("", "", item["arguments"]).has_malformed_arguments()
+            else item
+            for item in replayable_items(replay)
+        ]
     mapped: list[dict[str, Any]] = []
 
     if message.tool_calls:
