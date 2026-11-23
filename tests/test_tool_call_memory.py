@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from prism import ToolCall
+from prism import ToolCall, canonical
 
 
 @pytest.fixture(autouse=True)
@@ -33,10 +33,12 @@ def _peak(action: Callable[[], Any]) -> tuple[int, Any]:
         tracemalloc.stop()
 
 
-def test_checks_a_long_list_in_a_bounded_multiple_of_reading_it() -> None:
+def test_checks_a_long_list_in_about_the_memory_of_reading_and_encoding_it() -> None:
     text = '{"a":[' + ",".join(["0"] * 100_000) + "]}"
-    reading, _ = _peak(lambda: json.loads(text))
+    # The check must decode and encode the value. How much encoding holds
+    # differs between Python versions, so the bound is measured on this one.
+    necessary, _ = _peak(lambda: canonical.encode(json.loads(text)))
     checking, malformed = _peak(lambda: ToolCall("c", "t", text).has_malformed_arguments())
 
     assert malformed is False
-    assert checking / reading < 4
+    assert checking / necessary < 1.2
