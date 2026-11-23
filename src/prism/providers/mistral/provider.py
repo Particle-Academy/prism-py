@@ -29,7 +29,7 @@ from prism.providers.base import Provider
 from prism.providers.config import (
     UNSET,
     Unset,
-    configured_string,
+    configured_url,
     inherits_environment_credentials,
     scoped_string,
 )
@@ -87,7 +87,7 @@ class Mistral(Provider):
         stream_transport: StreamTransport | None = None,
         timeout: float | None = None,
     ) -> None:
-        resolved_url = configured_string(url, "MISTRAL_URL", DEFAULT_URL)
+        resolved_url = configured_url(url, "MISTRAL_URL", DEFAULT_URL)
         # Environment credentials belong to the environment's endpoint only.
         inherit = url is UNSET or inherits_environment_credentials(
             resolved_url, "MISTRAL_URL", DEFAULT_URL

@@ -367,7 +367,7 @@ URL_REFUSAL = "url must not contain whitespace or control characters"
 def attempt(name: str, config: dict[str, Any]) -> BaseException | None:
     try:
         Prism.text().using(name, "fixture-model", config).with_prompt("hi").as_text()
-    except Exception as error:  # noqa: BLE001 - the refusal is what is under test
+    except Exception as error:  # the refusal is what is under test
         return error
     return None
 

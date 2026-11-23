@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-BREAKING CHANGE: Credentials are now scoped to their configured endpoint; a per-call URL override must supply its own key. register_provider requires replace=True to replace a registered provider, and refuses an empty key or one containing whitespace, control, format or invisible characters even with replace=True.
+BREAKING CHANGE: Credentials are now scoped to their configured endpoint; a per-call URL override must supply its own key. register_provider requires replace=True to replace a registered provider, and refuses any key that does not match ASCII `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`, including a homoglyph or full-width look-alike, even with replace=True. A provider url, per call or from the environment, that contains whitespace or a control character anywhere is refused with ValueError before any request; it was previously trimmed for the endpoint comparison.
 
 ## 0.9.0 — 2026-11-05
 

@@ -51,6 +51,7 @@ from prism.providers.config import (
     UNSET,
     Unset,
     configured_string,
+    configured_url,
     inherits_environment_credentials,
     scoped_nullable_string,
     scoped_string,
@@ -119,7 +120,7 @@ class OpenAI(Provider):
         stream_transport: StreamTransport | None = None,
         timeout: float | None = None,
     ) -> None:
-        resolved_url = configured_string(url, "OPENAI_URL", DEFAULT_URL)
+        resolved_url = configured_url(url, "OPENAI_URL", DEFAULT_URL)
         # Environment credentials belong to the environment's endpoint only.
         inherit = url is UNSET or inherits_environment_credentials(
             resolved_url, "OPENAI_URL", DEFAULT_URL

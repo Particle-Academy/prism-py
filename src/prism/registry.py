@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import unicodedata
+import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from prism.errors import ErrorCode, PrismError
+from prism.providers.config import assert_clean_url
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from prism.providers.base import Provider
@@ -37,8 +38,9 @@ def register_provider(key: str, factory: ProviderFactory, *, replace: bool = Fal
     """
     if not _is_valid_provider_name(key):
         raise ValueError(
-            "That is not a valid provider name: a provider name must be non-empty"
-            " and contain no whitespace, control, format or invisible characters."
+            "That is not a valid provider name: a provider name must start with an"
+            ' ASCII letter or digit, contain only ASCII letters, digits, ".", "_"'
+            ' and "-", and be at most 64 characters long.'
         )
     if not replace and _is_registered(key):
         raise ValueError(
@@ -47,45 +49,23 @@ def register_provider(key: str, factory: ProviderFactory, *, replace: bool = Fal
     _FACTORIES[key] = factory
 
 
-# Codepoints that are invisible in a name: the G-36 set, spelled by codepoint
-# and identically to the human-plus confirmation guard and to the reference and
-# prism-ts. It covers every Unicode White_Space codepoint plus U+0000,
-# U+200B..U+200D and U+FEFF. str.isspace() / str.strip() disagree with the other
-# two languages' built-ins, so none of them is used.
-_INVISIBLE = frozenset(
-    [
-        0x0000,
-        *range(0x0009, 0x000D + 1),
-        0x0020,
-        0x0085,
-        0x00A0,
-        0x1680,
-        *range(0x2000, 0x200D + 1),
-        0x2028,
-        0x2029,
-        0x202F,
-        0x205F,
-        0x3000,
-        0xFEFF,
-    ]
-)
-
-_REFUSED_CATEGORIES = frozenset({"Cc", "Cf", "Cs"})
+# A provider key: ASCII, starting with a letter or digit, at most 64
+# characters. A positive allow-list rather than a list of forbidden characters,
+# so it needs no Unicode tables and reads the same as the reference's extend()
+# and prism-ts registerProvider(). match() with \Z, not $: $ would admit a
+# trailing newline. The class is spelled out, so no Unicode table is consulted.
+_VALID_PROVIDER_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z", re.ASCII)
 
 
 def _is_valid_provider_name(key: str) -> bool:
-    """Non-empty, with no Cc, Cf or Cs codepoint and none from the G-36 set.
+    """Whether ``key`` matches ``^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`` in ASCII.
 
-    `` openai``, ``openai `` and ``openai`` + U+200B are distinct keys that read
-    as the built-in in a config file or a log, so they are refused rather than
-    trimmed into another name. Same rule as the reference's extend() and
-    prism-ts registerProvider().
+    A homoglyph (Cyrillic U+043E for the first ``o``), a full-width ``openai``,
+    a padded one or one carrying an invisible codepoint is a second key that
+    reads as the built-in in a config file or a log, so it is refused, never
+    trimmed or folded.
     """
-    if not isinstance(key, str) or key == "":
-        return False
-    return not any(
-        ord(char) in _INVISIBLE or unicodedata.category(char) in _REFUSED_CATEGORIES for char in key
-    )
+    return isinstance(key, str) and _VALID_PROVIDER_NAME.match(key) is not None
 
 
 def _ascii_lower(value: str) -> str:
@@ -115,7 +95,10 @@ def resolve_provider(key: str, config: dict[str, Any] | None = None) -> Provider
             f"No provider is registered for '{key}'.",
         )
 
-    return factory(**(config or {}))
+    config = config or {}
+    # Before the factory runs, so a custom provider is held to the same rule.
+    assert_clean_url(config.get("url"))
+    return factory(**config)
 
 
 def _default_factory(key: str) -> ProviderFactory | None:

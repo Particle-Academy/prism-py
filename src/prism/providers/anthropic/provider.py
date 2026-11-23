@@ -28,6 +28,7 @@ from prism.providers.config import (
     Unset,
     anthropic_beta,
     configured_string,
+    configured_url,
     inherits_environment_credentials,
     scoped_string,
     thinking_budget_default,
@@ -76,7 +77,7 @@ class Anthropic(Provider):
         timeout: float | None = None,
         default_thinking_budget: Any = UNSET,
     ) -> None:
-        resolved_url = configured_string(url, "ANTHROPIC_URL", DEFAULT_URL, DEFAULT_URL)
+        resolved_url = configured_url(url, "ANTHROPIC_URL", DEFAULT_URL, DEFAULT_URL)
         # Environment credentials belong to the environment's endpoint only.
         inherit = url is UNSET or inherits_environment_credentials(
             resolved_url, "ANTHROPIC_URL", DEFAULT_URL, DEFAULT_URL

@@ -56,16 +56,66 @@ def nullable_string(value: str | Unset | None, name: str) -> str | None:
     return resolved
 
 
-# PHP trim()'s set, spelled out: a built-in strip() would also remove Unicode
-# whitespace the other implementations keep.
-_URL_EDGE = " \t\n\r\x00\x0b"
+# Codepoints a provider url may not contain anywhere, spelled by codepoint and
+# identically in the reference and prism-ts: every Cc control (U+0000..U+001F,
+# U+007F..U+009F), every Unicode White_Space codepoint, and the G-36
+# zero-widths U+200B..U+200D and U+FEFF. str.isspace() / str.strip() disagree
+# with the other two languages' built-ins, so neither is used.
+_URL_FORBIDDEN = frozenset(
+    [
+        *range(0x0000, 0x001F + 1),
+        0x0020,
+        *range(0x007F, 0x009F + 1),
+        0x00A0,
+        0x1680,
+        *range(0x2000, 0x200D + 1),
+        0x2028,
+        0x2029,
+        0x202F,
+        0x205F,
+        0x3000,
+        0xFEFF,
+    ]
+)
+
+
+def assert_clean_url(url: object) -> None:
+    """Refuse a url that carries whitespace or a control character anywhere.
+
+    It is never trimmed: where the key goes must not depend on how tolerant an
+    HTTP stack is of a padded url. The message names neither the url nor any
+    credential. A value that is not a string is left to the caller's own type
+    check.
+
+    :raises ValueError: for a url containing a forbidden codepoint.
+    """
+    if isinstance(url, str) and any(ord(char) in _URL_FORBIDDEN for char in url):
+        raise ValueError(
+            "That is not a valid provider url: a provider url must not contain"
+            " whitespace or control characters."
+        )
+
+
+def configured_url(
+    value: str | Unset | None, name: str, fallback: str, null_fallback: str | None = None
+) -> str:
+    """The provider url, with the environment's and the per-call value both checked.
+
+    A padded environment url is a misconfiguration even when this call
+    overrides it, so both are checked by :func:`assert_clean_url` first.
+    """
+    assert_clean_url(os.environ.get(name))
+    assert_clean_url(value)
+    return configured_string(value, name, fallback, null_fallback)
+
+
 _DEFAULT_PORTS = {"https": 443, "http": 80}
 
 
 def _endpoint_identity(url: str) -> tuple[str, ...] | None:
     """Endpoint identity: case-insensitive scheme/host, default port, no trailing slash."""
     try:
-        parts = urlsplit(url.strip(_URL_EDGE))
+        parts = urlsplit(url)
         port = parts.port
     except ValueError:
         return None
