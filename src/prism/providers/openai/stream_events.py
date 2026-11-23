@@ -89,7 +89,7 @@ def _tool_call(payload: dict[str, Any]) -> StreamEvent | None:
         tool_call=ToolCall(
             id=_str(item.get("call_id")) or _str(item.get("id")),
             name=_str(item.get("name")),
-            arguments=_str(item.get("arguments")),
+            arguments=ToolCall.storable_arguments(item.get("arguments")),
         ),
         message_id=_str(payload.get("item_id")) or _str(item.get("id")),
     )

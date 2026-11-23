@@ -46,11 +46,19 @@ def normalize(value: Any) -> Any:
             return int(value)
         return value
 
+    # Plain loops: before Python 3.12 a comprehension is a stack frame of its
+    # own, which halves the nesting that can be encoded.
     if isinstance(value, dict):
-        return {key: normalize(item) for key, item in value.items()}
+        mapped: dict[Any, Any] = {}
+        for key, item in value.items():
+            mapped[key] = normalize(item)
+        return mapped
 
     if isinstance(value, (list, tuple)):
-        return [normalize(item) for item in value]
+        items: list[Any] = []
+        for item in value:
+            items.append(normalize(item))
+        return items
 
     to_dict = getattr(value, "to_dict", None)
     if callable(to_dict):

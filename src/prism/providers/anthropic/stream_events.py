@@ -187,7 +187,7 @@ class AnthropicStreamMapper:
             return TextDeltaEvent(delta=text, message_id=self._message_id)
 
         if _str(delta.get("type")) == "input_json_delta":
-            block.text += _str(delta.get("partial_json"))
+            block.text = ToolCall.append_argument_fragment(block.text, delta.get("partial_json"))
 
         return None
 

@@ -9,7 +9,6 @@ JSON string rather than an object. Every one of those fails quietly.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -26,6 +25,7 @@ from prism.value_objects.messages import (
     ToolResultMessage,
     UserMessage,
 )
+from prism.value_objects.replayable_messages import replayable_messages
 
 __all__ = [
     "map_finish_reason",
@@ -68,7 +68,7 @@ def map_messages(
     """
     mapped: list[dict[str, Any]] = []
 
-    for message in [*system_prompts, *messages]:
+    for message in [*system_prompts, *replayable_messages(messages)]:
         mapped.extend(_map_message(message))
 
     return mapped
@@ -171,6 +171,10 @@ def _map_assistant_message(message: AssistantMessage) -> dict[str, Any]:
     body: dict[str, Any] = {"role": "assistant", "content": message.content}
 
     if message.tool_calls:
+        # Refuses unusable arguments here, as the other providers' maps do.
+        for call in message.tool_calls:
+            call.decoded_arguments()
+
         body["tool_calls"] = [
             {
                 "id": call.id,
@@ -180,11 +184,8 @@ def _map_assistant_message(message: AssistantMessage) -> dict[str, Any]:
                     # A JSON STRING, not an object -- the chat-completions
                     # shape. An object is accepted by some gateways and rejected
                     # by Mistral, which is the worst kind of difference to
-                    # carry. Already-string arguments pass through rather than
-                    # being re-encoded into a quoted string.
-                    "arguments": call.arguments
-                    if isinstance(call.arguments, str)
-                    else json.dumps(call.arguments),
+                    # carry.
+                    "arguments": call.replayable_arguments_text(),
                 },
             }
             for call in message.tool_calls

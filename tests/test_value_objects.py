@@ -143,8 +143,11 @@ def test_raw_control_characters_inside_strings_are_recovered() -> None:
     assert ToolCall("fc", "t", '{"a":"x\ny"}').decoded_arguments() == {"a": "x\ny"}
 
 
-def test_arguments_that_decode_to_a_non_object_become_no_arguments() -> None:
-    assert ToolCall("fc", "t", "[1,2]").decoded_arguments() == {}
+def test_arguments_that_decode_to_a_non_object_are_refused() -> None:
+    with pytest.raises(PrismError) as raised:
+        ToolCall("fc", "t", "[1,2]").decoded_arguments()
+
+    assert raised.value.code == "malformed_tool_call_arguments"
 
 
 # -- usage ------------------------------------------------------------------
