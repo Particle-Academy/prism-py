@@ -28,6 +28,8 @@ from prism.providers.config import (
     Unset,
     anthropic_beta,
     configured_string,
+    inherits_environment_credentials,
+    scoped_string,
     thinking_budget_default,
 )
 from prism.streaming.events import ErrorEvent, StreamEvent
@@ -74,8 +76,13 @@ class Anthropic(Provider):
         timeout: float | None = None,
         default_thinking_budget: Any = UNSET,
     ) -> None:
-        self.api_key = configured_string(api_key, "ANTHROPIC_API_KEY", "")
-        self.url = configured_string(url, "ANTHROPIC_URL", DEFAULT_URL, DEFAULT_URL).rstrip("/")
+        resolved_url = configured_string(url, "ANTHROPIC_URL", DEFAULT_URL, DEFAULT_URL)
+        # Environment credentials belong to the environment's endpoint only.
+        inherit = url is UNSET or inherits_environment_credentials(
+            resolved_url, "ANTHROPIC_URL", DEFAULT_URL, DEFAULT_URL
+        )
+        self.url = resolved_url.rstrip("/")
+        self.api_key = scoped_string(api_key, "ANTHROPIC_API_KEY", inherit, "")
         self.api_version = configured_string(
             api_version, "ANTHROPIC_API_VERSION", DEFAULT_API_VERSION
         )

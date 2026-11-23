@@ -26,7 +26,13 @@ from prism.http import (
     encode_multipart,
 )
 from prism.providers.base import Provider
-from prism.providers.config import UNSET, Unset, configured_string
+from prism.providers.config import (
+    UNSET,
+    Unset,
+    configured_string,
+    inherits_environment_credentials,
+    scoped_string,
+)
 from prism.providers.mistral.embeddings import build_embeddings_body, parse_embeddings_response
 from prism.providers.mistral.fim import parse_fim_response
 from prism.providers.mistral.rate_limits import parse_rate_limits
@@ -81,8 +87,13 @@ class Mistral(Provider):
         stream_transport: StreamTransport | None = None,
         timeout: float | None = None,
     ) -> None:
-        self.api_key = configured_string(api_key, "MISTRAL_API_KEY", "")
-        self.url = configured_string(url, "MISTRAL_URL", DEFAULT_URL).rstrip("/")
+        resolved_url = configured_string(url, "MISTRAL_URL", DEFAULT_URL)
+        # Environment credentials belong to the environment's endpoint only.
+        inherit = url is UNSET or inherits_environment_credentials(
+            resolved_url, "MISTRAL_URL", DEFAULT_URL
+        )
+        self.url = resolved_url.rstrip("/")
+        self.api_key = scoped_string(api_key, "MISTRAL_API_KEY", inherit, "")
         self.timeout = timeout
         self._transport: Transport = transport or UrllibTransport()
         self._stream_transport: StreamTransport = stream_transport or UrllibStreamTransport()

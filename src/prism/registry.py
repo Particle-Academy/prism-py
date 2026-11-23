@@ -16,10 +16,38 @@ ProviderFactory = Callable[..., "Provider"]
 
 _FACTORIES: dict[str, ProviderFactory] = {}
 
+_BUILT_INS = ("anthropic", "mistral", "openai")
 
-def register_provider(key: str, factory: ProviderFactory) -> None:
-    """Teach the builder about a provider key."""
+
+def register_provider(key: str, factory: ProviderFactory, *, replace: bool = False) -> None:
+    """Teach the builder about a provider key.
+
+    A key that is already registered -- a built-in such as ``openai``, or one
+    registered earlier, compared case-insensitively -- is refused unless
+    ``replace=True`` is passed. Replacing a provider changes what every caller
+    of that key gets, process-wide, so it has to be asked for.
+
+    :raises ValueError: when the key is taken and ``replace`` is not set (a
+        programming error; it carries no Prism error code).
+    """
+    if not replace and _is_registered(key):
+        raise ValueError(
+            f"The provider '{key}' is already registered. Pass replace=True to replace it."
+        )
     _FACTORIES[key] = factory
+
+
+def _ascii_lower(value: str) -> str:
+    """ASCII-only case folding, as the reference's strtolower() does."""
+    return value.translate(_ASCII_LOWER)
+
+
+_ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
+
+
+def _is_registered(key: str) -> bool:
+    name = _ascii_lower(key)
+    return name in _BUILT_INS or any(_ascii_lower(known) == name for known in _FACTORIES)
 
 
 def resolve_provider(key: str, config: dict[str, Any] | None = None) -> Provider:
@@ -48,19 +76,19 @@ def _default_factory(key: str) -> ProviderFactory | None:
     if key == "anthropic":
         from prism.providers.anthropic.provider import Anthropic
 
-        register_provider("anthropic", Anthropic)
+        _FACTORIES["anthropic"] = Anthropic
         return Anthropic
 
     if key == "mistral":
         from prism.providers.mistral.provider import Mistral
 
-        register_provider("mistral", Mistral)
+        _FACTORIES["mistral"] = Mistral
         return Mistral
 
     if key == "openai":
         from prism.providers.openai.provider import OpenAI
 
-        register_provider("openai", OpenAI)
+        _FACTORIES["openai"] = OpenAI
         return OpenAI
 
     return None

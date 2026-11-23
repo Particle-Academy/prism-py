@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+BREAKING CHANGE: Credentials are now scoped to their configured endpoint; a per-call URL override must supply its own key. register_provider requires replace=True to replace a registered provider.
+
 ## 0.9.0 — 2026-11-05
 
 BREAKING CHANGE: Distinguish omitted provider arguments from explicit `None` and empty strings. Nullable fields no longer fall back to environment when passed `None`; string-only null/scalar inputs are refused. See the README migration table.

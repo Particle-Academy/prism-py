@@ -10,6 +10,7 @@ import warnings
 from decimal import Decimal
 from enum import Enum
 from typing import Any
+from urllib.parse import urlsplit
 
 
 class Unset(Enum):
@@ -53,6 +54,83 @@ def nullable_string(value: str | Unset | None, name: str) -> str | None:
     if resolved is not None and not isinstance(resolved, str):
         raise TypeError(f"Invalid nullable string configuration for {name}.")
     return resolved
+
+
+# PHP trim()'s set, spelled out: a built-in strip() would also remove Unicode
+# whitespace the other implementations keep.
+_URL_EDGE = " \t\n\r\x00\x0b"
+_DEFAULT_PORTS = {"https": 443, "http": 80}
+
+
+def _endpoint_identity(url: str) -> tuple[str, ...] | None:
+    """Endpoint identity: case-insensitive scheme/host, default port, no trailing slash."""
+    try:
+        parts = urlsplit(url.strip(_URL_EDGE))
+        port = parts.port
+    except ValueError:
+        return None
+    host = parts.hostname
+    if not parts.scheme or not host:
+        return None
+    scheme = parts.scheme.lower()
+    if port is None:
+        port = _DEFAULT_PORTS.get(scheme)
+    return (
+        scheme,
+        parts.username or "",
+        parts.password or "",
+        host.lower(),
+        "" if port is None else str(port),
+        parts.path.rstrip("/"),
+        parts.query,
+    )
+
+
+def same_endpoint(a: str, b: str) -> bool:
+    """True when two URLs name the same endpoint.
+
+    A trailing slash or a difference in the case of the scheme or host does not
+    make a different endpoint; a different scheme, userinfo, host, port, path or
+    query does. An unparseable URL is never the same endpoint.
+    """
+    left = _endpoint_identity(a)
+    return left is not None and left == _endpoint_identity(b)
+
+
+def inherits_environment_credentials(
+    url: str, url_name: str, fallback: str, null_fallback: str | None = None
+) -> bool:
+    """Whether environment credentials apply to ``url``.
+
+    Only when it is the URL the environment configures, or the provider default
+    when none is configured.
+    """
+    try:
+        configured_url = configured_string(UNSET, url_name, fallback, null_fallback)
+    except TypeError:
+        # An unusable environment URL configures no endpoint to scope a key to.
+        return False
+    return url == configured_url or same_endpoint(url, configured_url)
+
+
+def scoped_string(
+    value: str | Unset | None,
+    name: str,
+    inherit: bool,
+    fallback: str,
+    null_fallback: str | None = None,
+) -> str:
+    """``configured_string``, reading the environment only when ``inherit`` is true."""
+    if value is UNSET and not inherit:
+        return fallback
+    return configured_string(value, name, fallback, null_fallback)
+
+
+def scoped_nullable_string(value: str | Unset | None, name: str, inherit: bool) -> str | None:
+    """``nullable_string``, reading the environment only when ``inherit`` is true."""
+    if value is UNSET and not inherit:
+        return None
+    return nullable_string(value, name)
 
 
 def anthropic_beta(value: str | Unset | None) -> str | None:
