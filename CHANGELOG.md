@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-BREAKING CHANGE: Credentials are now scoped to their configured endpoint; a per-call URL override must supply its own key. register_provider requires replace=True to replace a registered provider.
+BREAKING CHANGE: Credentials are now scoped to their configured endpoint; a per-call URL override must supply its own key. register_provider requires replace=True to replace a registered provider, and refuses an empty key or one containing whitespace, control, format or invisible characters even with replace=True.
 
 ## 0.9.0 — 2026-11-05
 

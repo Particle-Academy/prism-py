@@ -177,7 +177,9 @@ endpoint. A different scheme, userinfo, host, port, path or query is not.
 
 `register_provider()` refuses a key that is already registered -- a built-in
 such as `openai`, or one registered earlier, compared case-insensitively --
-unless `replace=True` is passed.
+unless `replace=True` is passed. It also raises `ValueError` for an empty key or
+one containing whitespace, control characters, or invisible characters such as
+a zero-width space, even with `replace=True`. The key is not trimmed.
 
 Anthropic reads `ANTHROPIC_API_KEY`, `ANTHROPIC_URL`, `ANTHROPIC_API_VERSION`
 and canonical `ANTHROPIC_BETA`. Legacy `ANTHROPIC_BETA_FEATURES` is consumed
