@@ -266,3 +266,53 @@ def test_replacing_a_built_in_explicitly_is_allowed() -> None:
     replacement = _Stub()
     register_provider("openai", lambda **_: replacement, replace=True)
     assert resolve_provider("openai") is replacement
+
+
+# A provider name a human cannot read correctly is refused, not trimmed. The
+# rule is spelled identically in the reference and prism-ts: non-empty, and no
+# whitespace, control (Cc) or format (Cf) character, nor any codepoint of the
+# G-36 set the human-plus confirmation guard normalises. Codepoints are written
+# with chr() so the test says exactly which character it sends.
+UNREADABLE_NAMES = {
+    "empty": "",
+    "leading space": " openai",
+    "trailing space": "openai ",
+    "interior space": "open ai",
+    "tab": "openai" + chr(0x09),
+    "newline": "openai" + chr(0x0A),
+    "NUL": "openai" + chr(0x00),
+    "C0 control": "openai" + chr(0x1F),
+    "NEL": "openai" + chr(0x85),
+    "no-break space": "openai" + chr(0xA0),
+    "ideographic space": "open" + chr(0x3000) + "ai",
+    "zero-width space": "openai" + chr(0x200B),
+    "zero-width joiner": "open" + chr(0x200D) + "ai",
+    "BOM prefix": chr(0xFEFF) + "openai",
+    "right-to-left override (Cf)": "openai" + chr(0x202E),
+    "word joiner (Cf, outside G-36)": "openai" + chr(0x2060),
+    "soft hyphen (Cf)": "open" + chr(0xAD) + "ai",
+    "lone surrogate": "openai" + chr(0xD800),
+}
+
+
+@pytest.mark.parametrize("name", list(UNREADABLE_NAMES.values()), ids=list(UNREADABLE_NAMES))
+def test_refuses_a_provider_name_that_is_empty_or_carries_an_invisible_character(name: str) -> None:
+    import prism.registry as registry
+
+    with pytest.raises(ValueError, match="not a valid provider name"):
+        register_provider(name, _Stub)
+    # Refused even when replacement is explicit: replace does not license a name.
+    with pytest.raises(ValueError, match="not a valid provider name"):
+        register_provider(name, _Stub, replace=True)
+
+    assert name not in registry._FACTORIES
+    assert isinstance(resolve_provider("openai", {"api_key": "x"}), OpenAI)
+
+
+@pytest.mark.parametrize(
+    "name", ["credential-scope-plain", "my_provider.v2", "acme:edge", "caf" + chr(0xE9)]
+)
+def test_still_accepts_an_ordinary_custom_provider_name(name: str) -> None:
+    replacement = _Stub()
+    register_provider(name, lambda **_: replacement)
+    assert resolve_provider(name) is replacement
