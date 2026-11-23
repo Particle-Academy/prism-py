@@ -171,7 +171,9 @@ class MistralStreamMapper:
             self._tool_calls[index] = {
                 "id": _string(raw.get("id")) or existing["id"],
                 "name": _string(function.get("name")) or existing["name"],
-                "args": existing["args"] + _string(function.get("arguments")),
+                "args": ToolCall.append_argument_fragment(
+                    existing["args"], function.get("arguments")
+                ),
             }
 
 

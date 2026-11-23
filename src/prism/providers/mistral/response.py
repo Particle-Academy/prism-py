@@ -212,7 +212,9 @@ def _map_tool_calls(message: Mapping[str, Any]) -> list[ToolCall]:
                 # A JSON STRING on the wire, like OpenAI's chat completions and
                 # unlike Anthropic's decoded dict. Kept as the string;
                 # `parsed_arguments()` is the one place it is decoded.
-                arguments=arguments if isinstance(arguments, (str, dict)) else "{}",
+                arguments="{}"
+                if "arguments" not in function
+                else ToolCall.storable_arguments(arguments),
             )
         )
 

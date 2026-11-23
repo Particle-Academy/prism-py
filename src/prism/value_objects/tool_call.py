@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from prism import canonical
 from prism.errors import ErrorCode, PrismError
 
 __all__ = ["ToolCall"]
 
-_MAX_JSON_DEPTH = 511
+# The deepest nesting accepted. A provider wraps the arguments in its own request
+# envelope, and the reference encodes that request with a depth limit of 512, so
+# the limit leaves room for the deepest envelope.
+_MAX_ARGUMENT_DEPTH = 500
 
 _INTEGER_KEY = re.compile(r"0|-?[1-9][0-9]*", re.ASCII)
 
@@ -73,7 +78,65 @@ class ToolCall:
         if not isinstance(decoded, dict) or any(_is_integer_key(key) for key in decoded):
             raise PrismError.tool_call_arguments_not_an_object(self.name)
 
+        # Admitted only if a follow-up request can carry it, in any language.
+        if not _can_be_sent_back(decoded):
+            raise PrismError.malformed_tool_call_arguments(self.name)
+
         return decoded
+
+    @staticmethod
+    def storable_arguments(value: Any) -> str | dict[str, Any]:
+        """A provider's value as this class stores it.
+
+        ``None`` means none were given. Any other value that is neither text nor
+        a map is held as a one-item list, the one form that is refused whatever
+        the value was: ``0`` and ``False`` must not turn into "no arguments" on
+        the way in.
+        """
+        if isinstance(value, (str, dict)):
+            return value
+        if value is None:
+            return ""
+        if value == [] and isinstance(value, list):
+            return "[]"
+
+        try:
+            return json.dumps([value])
+        except (TypeError, ValueError):
+            return "[null]"
+
+    @staticmethod
+    def append_argument_fragment(text: str, fragment: Any) -> str:
+        """The accumulated text once a streamed fragment is added.
+
+        A fragment that is not text makes the whole value unreadable, wherever
+        it arrived: a leading ``]`` can never become valid JSON, whatever is
+        appended after it.
+        """
+        if fragment is None:
+            return text
+
+        return text + fragment if isinstance(fragment, str) else f"]{text}"
+
+    def replayable_arguments_text(self) -> str:
+        """The arguments as text for a provider field that carries them as written.
+
+        The original text when it is valid JSON naming values, otherwise the
+        same value encoded, and ``{}`` for no arguments or unusable ones.
+        """
+        if (
+            isinstance(self.arguments, str)
+            and not self.has_malformed_arguments()
+            and self.decoded_arguments()
+        ):
+            try:
+                json.loads(self.arguments)
+            except ValueError:
+                pass  # Valid only after repair, so it is sent encoded.
+            else:
+                return self.arguments
+
+        return canonical.encode(self.without_malformed_arguments().decoded_arguments())
 
     def has_malformed_arguments(self) -> bool:
         """Whether :meth:`decoded_arguments` would refuse these arguments."""
@@ -109,9 +172,6 @@ class ToolCall:
         except (ValueError, RecursionError) as exc:
             raise PrismError.malformed_tool_call_arguments(self.name) from exc
 
-        if not _decodes_in_every_language(decoded):
-            raise PrismError.malformed_tool_call_arguments(self.name)
-
         return decoded
 
     def to_dict(self) -> dict[str, Any]:
@@ -145,35 +205,69 @@ def _has_lone_surrogate(text: str) -> bool:
     return any("\ud800" <= char <= "\udfff" for char in text)
 
 
-def _decodes_in_every_language(root: Any) -> bool:
-    """The reference's decoder refuses a lone surrogate and nesting past 511.
+def _is_finite_number(value: int | float) -> bool:
+    """Whether the number fits a double, which is what the other languages hold."""
+    if isinstance(value, float):
+        return math.isfinite(value)
 
-    Walked with a stack, so deep input cannot overflow the call stack here.
+    try:
+        float(value)
+    except OverflowError:
+        return False
+
+    return True
+
+
+def _can_be_sent_back(root: dict[str, Any]) -> bool:
+    """Whether a decoded value survives the encode a follow-up request uses.
+
+    In every language: no non-finite number, no key starting with NUL, no lone
+    surrogate, and no deeper than the limit. Walked with a stack, so deep input
+    cannot overflow the call stack here.
     """
     pending: list[tuple[Any, int]] = [(root, 1)]
 
     while pending:
         value, depth = pending.pop()
 
-        if isinstance(value, str):
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            if not _is_finite_number(value):
+                return False
+        elif isinstance(value, str):
             if _has_lone_surrogate(value):
                 return False
         elif isinstance(value, (list, dict)):
-            if depth > _MAX_JSON_DEPTH:
+            if depth > _MAX_ARGUMENT_DEPTH:
                 return False
             if isinstance(value, dict):
-                if any(_has_lone_surrogate(key) for key in value):
-                    return False
+                for key in value:
+                    if (
+                        not isinstance(key, str)
+                        or key.startswith("\x00")
+                        or _has_lone_surrogate(key)
+                    ):
+                        return False
                 pending.extend((item, depth + 1) for item in value.values())
             else:
                 pending.extend((item, depth + 1) for item in value)
+
+    try:
+        canonical.encode(root)
+    except (TypeError, ValueError, RecursionError, PrismError):
+        return False
 
     return True
 
 
 def _is_integer_key(key: object) -> bool:
     """A key PHP would store as an integer: canonical decimal, within 64 bits."""
-    if not isinstance(key, str) or _INTEGER_KEY.fullmatch(key) is None:
+    if isinstance(key, int):
+        return True
+
+    # Twenty characters is the longest 64-bit integer, with its sign.
+    if not isinstance(key, str) or len(key) > 20 or _INTEGER_KEY.fullmatch(key) is None:
         return False
 
     return -(2**63) <= int(key) <= 2**63 - 1
@@ -182,9 +276,9 @@ def _is_integer_key(key: object) -> bool:
 def _escape_control_characters_in_strings(raw: str) -> str:
     """Escape raw control characters inside JSON string literals.
 
-    Control characters outside a string can never be valid and are dropped,
-    except for tab, newline and carriage return, which are legal whitespace
-    between tokens and are kept.
+    Anything else is left as it is, so that the decode refuses it: a control
+    character outside a string, or straight after a backslash, has no value it
+    can be repaired to.
     """
     result: list[str] = []
     in_string = False
@@ -192,9 +286,9 @@ def _escape_control_characters_in_strings(raw: str) -> str:
 
     for char in raw:
         if ord(char) <= 0x1F:
-            if in_string:
+            if in_string and not escaped:
                 result.append(_CONTROL_ESCAPES.get(char, f"\\u{ord(char):04x}"))
-            elif char in ("\t", "\n", "\r"):
+            else:
                 result.append(char)
             escaped = False
             continue

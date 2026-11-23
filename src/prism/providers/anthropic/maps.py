@@ -236,7 +236,7 @@ def map_tool_calls(blocks: Sequence[Mapping[str, Any]]) -> list[ToolCall]:
             id=data_get(block, "id", ""),
             name=data_get(block, "name", ""),
             # An object on the wire, unlike the Responses API's JSON string.
-            arguments=data_get(block, "input", {}) or {},
+            arguments=ToolCall.storable_arguments(data_get(block, "input", {})),
         )
         for block in blocks
     ]

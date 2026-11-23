@@ -147,10 +147,13 @@ def _map_assistant_message(message: AssistantMessage) -> list[dict[str, Any]]:
     if isinstance(replay, list) and replay:
         # The same replay every other path sends for unusable arguments.
         return [
-            {**item, "arguments": "{}"}
+            {
+                **item,
+                "arguments": _ToolCall(
+                    "", "", _ToolCall.storable_arguments(item.get("arguments"))
+                ).replayable_arguments_text(),
+            }
             if item.get("type") == "function_call"
-            and isinstance(item.get("arguments"), str)
-            and _ToolCall("", "", item["arguments"]).has_malformed_arguments()
             else item
             for item in replayable_items(replay)
         ]
@@ -337,7 +340,7 @@ def map_tool_calls(
         ToolCall(
             id=data_get(item, "id"),
             name=data_get(item, "name"),
-            arguments=data_get(item, "arguments"),
+            arguments=ToolCall.storable_arguments(data_get(item, "arguments")),
             result_id=data_get(item, "call_id"),
             reasoning_id=data_get(reasonings, "0.id"),
             reasoning_summary=data_get(reasonings, "0.summary"),

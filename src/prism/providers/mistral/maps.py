@@ -9,7 +9,6 @@ JSON string rather than an object. Every one of those fails quietly.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -185,11 +184,8 @@ def _map_assistant_message(message: AssistantMessage) -> dict[str, Any]:
                     # A JSON STRING, not an object -- the chat-completions
                     # shape. An object is accepted by some gateways and rejected
                     # by Mistral, which is the worst kind of difference to
-                    # carry. Already-string arguments pass through rather than
-                    # being re-encoded into a quoted string.
-                    "arguments": call.arguments
-                    if isinstance(call.arguments, str)
-                    else json.dumps(call.arguments),
+                    # carry.
+                    "arguments": call.replayable_arguments_text(),
                 },
             }
             for call in message.tool_calls
