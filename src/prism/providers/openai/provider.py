@@ -47,7 +47,15 @@ from prism.images.response import ImagesResponse
 from prism.moderation.request import ModerationRequest
 from prism.moderation.response import ModerationResponse
 from prism.providers.base import Provider
-from prism.providers.config import UNSET, Unset, configured_string, nullable_string
+from prism.providers.config import (
+    UNSET,
+    Unset,
+    configured_string,
+    configured_url,
+    inherits_environment_credentials,
+    scoped_nullable_string,
+    scoped_string,
+)
 from prism.providers.openai.audio import (
     build_speech_body,
     build_transcription_form,
@@ -112,10 +120,15 @@ class OpenAI(Provider):
         stream_transport: StreamTransport | None = None,
         timeout: float | None = None,
     ) -> None:
-        self.api_key = configured_string(api_key, "OPENAI_API_KEY", "", "")
-        self.url = configured_string(url, "OPENAI_URL", DEFAULT_URL).rstrip("/")
-        self.organization = nullable_string(organization, "OPENAI_ORGANIZATION")
-        self.project = nullable_string(project, "OPENAI_PROJECT")
+        resolved_url = configured_url(url, "OPENAI_URL", DEFAULT_URL)
+        # Environment credentials belong to the environment's endpoint only.
+        inherit = url is UNSET or inherits_environment_credentials(
+            resolved_url, "OPENAI_URL", DEFAULT_URL
+        )
+        self.url = resolved_url.rstrip("/")
+        self.api_key = scoped_string(api_key, "OPENAI_API_KEY", inherit, "", "")
+        self.organization = scoped_nullable_string(organization, "OPENAI_ORGANIZATION", inherit)
+        self.project = scoped_nullable_string(project, "OPENAI_PROJECT", inherit)
         self.api_format = configured_string(
             api_format, "OPENAI_API_FORMAT", "responses", "responses"
         )

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+BREAKING CHANGE: Credentials are now scoped to their configured endpoint; a per-call URL override must supply its own key. register_provider requires replace=True to replace a registered provider, and refuses any key that does not match ASCII `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`, including a homoglyph or full-width look-alike, even with replace=True. A provider url, per call or from the environment, that contains whitespace or a control character anywhere is refused with ValueError before any request; it was previously trimmed for the endpoint comparison.
+
 ## 0.9.0 — 2026-11-05
 
 BREAKING CHANGE: Distinguish omitted provider arguments from explicit `None` and empty strings. Nullable fields no longer fall back to environment when passed `None`; string-only null/scalar inputs are refused. See the README migration table.
