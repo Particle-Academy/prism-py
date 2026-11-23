@@ -271,3 +271,49 @@ def test_still_replays_an_answered_non_object_call_empty(provider: str) -> None:
     assert _failure_of(pending) is None
     sent = _replayed(provider, transport)
     assert (json.loads(sent) if isinstance(sent, str) else sent) == {}
+
+
+def _nested(depth: int) -> str:
+    return '{"a":' * (depth - 1) + "{}" + "}" * (depth - 1)
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        '{"a":NaN}',
+        '{"a":Infinity}',
+        '{"a":-Infinity}',
+        '{"a":"\\ud800"}',
+        '{"a":"\\udc00"}',
+        '{"\\ud800":1}',
+        _nested(512),
+        _nested(100000),
+    ],
+    ids=["nan", "inf", "neg-inf", "high", "low", "key", "depth-512", "depth-huge"],
+)
+def test_refuses_what_the_other_languages_refuse(arguments: str) -> None:
+    assert ToolCall("c", "t", arguments).has_malformed_arguments() is True
+
+
+@pytest.mark.parametrize(
+    "arguments", ['{"a":"\\ud83d\\ude00"}', _nested(511)], ids=["pair", "depth-511"]
+)
+def test_accepts_what_the_other_languages_accept(arguments: str) -> None:
+    assert ToolCall("c", "t", arguments).has_malformed_arguments() is False
+
+
+def test_mistral_refuses_an_unanswered_unusable_call_at_mapping() -> None:
+    transport = RecordingTransport("mistral")
+    pending = (
+        Prism.text()
+        .using("mistral", "m", {"transport": transport})
+        .with_messages(
+            [
+                UserMessage("Weather?"),
+                AssistantMessage("", [ToolCall("call_1", "weather", "5", "call_1")]),
+            ]
+        )
+    )
+
+    assert "not a JSON object" in (_failure_of(pending) or "")
+    assert transport.sent is None

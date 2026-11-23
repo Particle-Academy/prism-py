@@ -172,6 +172,10 @@ def _map_assistant_message(message: AssistantMessage) -> dict[str, Any]:
     body: dict[str, Any] = {"role": "assistant", "content": message.content}
 
     if message.tool_calls:
+        # Refuses unusable arguments here, as the other providers' maps do.
+        for call in message.tool_calls:
+            call.decoded_arguments()
+
         body["tool_calls"] = [
             {
                 "id": call.id,

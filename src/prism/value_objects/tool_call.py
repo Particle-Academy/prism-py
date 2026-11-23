@@ -12,6 +12,8 @@ from prism.errors import ErrorCode, PrismError
 
 __all__ = ["ToolCall"]
 
+_MAX_JSON_DEPTH = 511
+
 _INTEGER_KEY = re.compile(r"0|-?[1-9][0-9]*", re.ASCII)
 
 _CONTROL_ESCAPES = {
@@ -93,16 +95,24 @@ class ToolCall:
 
     def _decode(self, text: str) -> Any:
         try:
-            return json.loads(text)
-        except ValueError:
-            # Some providers (DeepSeek when streaming, notably) emit raw control
-            # characters inside string values, which RFC 8259 requires to be
-            # escaped. Escape them in place — stripping them would corrupt
-            # intentional newlines and tabs — and decode again.
             try:
-                return json.loads(_escape_control_characters_in_strings(text))
-            except ValueError as exc:
-                raise PrismError.malformed_tool_call_arguments(self.name) from exc
+                decoded = json.loads(text, parse_constant=_refuse_constant)
+            except ValueError:
+                # Some providers (DeepSeek when streaming, notably) emit raw
+                # control characters inside string values, which RFC 8259
+                # requires to be escaped. Escape them in place — stripping them
+                # would corrupt intentional newlines and tabs — and decode again.
+                decoded = json.loads(
+                    _escape_control_characters_in_strings(text),
+                    parse_constant=_refuse_constant,
+                )
+        except (ValueError, RecursionError) as exc:
+            raise PrismError.malformed_tool_call_arguments(self.name) from exc
+
+        if not _decodes_in_every_language(decoded):
+            raise PrismError.malformed_tool_call_arguments(self.name)
+
+        return decoded
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -124,6 +134,41 @@ class ToolCall:
             reasoning_id=data.get("reasoning_id"),
             reasoning_summary=data.get("reasoning_summary"),
         )
+
+
+def _refuse_constant(name: str) -> Any:
+    """``NaN`` and ``Infinity`` are not JSON; Python's decoder accepts them."""
+    raise ValueError(f"{name} is not valid JSON")
+
+
+def _has_lone_surrogate(text: str) -> bool:
+    return any("\ud800" <= char <= "\udfff" for char in text)
+
+
+def _decodes_in_every_language(root: Any) -> bool:
+    """The reference's decoder refuses a lone surrogate and nesting past 511.
+
+    Walked with a stack, so deep input cannot overflow the call stack here.
+    """
+    pending: list[tuple[Any, int]] = [(root, 1)]
+
+    while pending:
+        value, depth = pending.pop()
+
+        if isinstance(value, str):
+            if _has_lone_surrogate(value):
+                return False
+        elif isinstance(value, (list, dict)):
+            if depth > _MAX_JSON_DEPTH:
+                return False
+            if isinstance(value, dict):
+                if any(_has_lone_surrogate(key) for key in value):
+                    return False
+                pending.extend((item, depth + 1) for item in value.values())
+            else:
+                pending.extend((item, depth + 1) for item in value)
+
+    return True
 
 
 def _is_integer_key(key: object) -> bool:
