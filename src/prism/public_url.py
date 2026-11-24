@@ -89,19 +89,21 @@ def is_public_address(address: str) -> bool:
     except ValueError:
         return False
     if parsed.version == 6:
-        for network, offset in _EMBEDDING:
-            if parsed in network:
-                embedded = ipaddress.IPv4Address(parsed.packed[offset : offset + 4])
-                return is_public_address(str(embedded))
         # ISATAP (RFC 5214) puts an IPv4 address in the low 32 bits behind the
         # interface identifier 0000:5efe (0200:5efe with the u bit, and the g bit
         # may be set too), under ANY prefix. On an ISATAP site the packet is
         # tunnelled to that IPv4 address, so it is judged as well; the prefix is
         # still judged below.
+        # Checked before NAT64 and 6to4, which return early, so a 6to4 prefix
+        # cannot hide an ISATAP address.
         packed = parsed.packed
         if packed[8] & 0xFC == 0 and packed[9:12] == bytes((0x00, 0x5E, 0xFE)):
             if not is_public_address(str(ipaddress.IPv4Address(packed[12:16]))):
                 return False
+        for network, offset in _EMBEDDING:
+            if parsed in network:
+                embedded = ipaddress.IPv4Address(parsed.packed[offset : offset + 4])
+                return is_public_address(str(embedded))
     return not any(parsed in network for network in _BLOCKED)
 
 
