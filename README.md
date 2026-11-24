@@ -251,11 +251,20 @@ private (RFC 1918), link-local, CGNAT, unspecified, documentation, multicast or
 reserved address, an IPv4-mapped, NAT64 or 6to4 IPv6 address embedding one of
 those, `localhost` or any `*.localhost`, `localhost.localdomain`,
 `ip6-localhost`, `ip6-loopback`, `metadata`, `metadata.google.internal` or
-`instance-data`. Every IPv4 spelling a resolver accepts is read (`2130706433`,
-`0177.0.0.1`, `0x7f000001`, `127.1`), and one that cannot be read is refused. A
-url that is not absolute `http`/`https` is refused with `scheme_not_allowed`.
-Neither message names the url, host or address. No DNS lookup is made, so a
-hostname that resolves to a private address is not caught here.
+`instance-data`. IPv4 literals are read in the shortened and numeric forms a
+resolver accepts (`2130706433`, `0177.0.0.1`, `0x7f000001`, `127.1`), and one
+that cannot be read is refused. Trailing dots are ignored, so `localhost.` is
+refused like `localhost`. The host is also refused, with the same code, when as
+written it holds anything other than letters, digits, `-` and `.` (or an IPv6
+address in brackets): a percent escape is refused, not decoded, and so is a
+backslash before the path. A url that is not absolute `http`/`https` is refused
+with `scheme_not_allowed`. No message names the url, host or address.
+
+**The check does not resolve DNS.** A public hostname that resolves to a private
+address (a wildcard-DNS name such as `127.0.0.1.nip.io`, for example) is not
+refused. It stops mistakes and literal addresses, not someone who can choose the
+hostname. If a per-call url can come from a user, allow only known hosts or
+restrict outbound traffic at the network level as well.
 
 A per-call url that is the same endpoint as the configured one is not checked:
 the call is not choosing a new address. A custom provider from

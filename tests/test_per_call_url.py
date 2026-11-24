@@ -158,6 +158,74 @@ def test_a_per_call_url_that_is_not_http_is_refused(sent: list[str]) -> None:
     assert_refused(error, sent, "scheme_not_allowed", SCHEME_MESSAGE)
 
 
+HOST_MESSAGE = (
+    "A per-call provider url host may hold only letters, digits, hyphens and dots,"
+    " or an IPv6 address in brackets."
+)
+
+# A host is judged as written. Some HTTP clients percent-decode a host before
+# they connect, so the guard never decodes: an escape, or any character a
+# hostname or address literal may not hold, is refused, and so is a backslash
+# in the authority, which URL parsers split in different places.
+ESCAPED_OR_ILLEGAL = [
+    "http://loc%61lhost:8080/admin",
+    "http://LOC%41LHOST/v1",
+    "http://localhost%2e/v1",
+    "http://127.0.0.1%2e/v1",
+    "http://127.0.0.1%00.evil.com/v1",
+    "http://%31%32%37.0.0.1/v1",
+    "http://169.254.169.254%2e/latest/meta-data/",
+    "http://metadata.google.internal%2e/x",
+    "https://gateway%2eexample/v1",
+    "https://gate_way.example/v1",
+    "http://127.0.0.1\\@gateway.example/v1",
+    "http://gateway.example\\@127.0.0.1/v1",
+    "http://[fe80::1%25eth0]/v1",
+    "http://[::%31]/v1",
+]
+
+
+@pytest.mark.parametrize("url", ESCAPED_OR_ILLEGAL)
+def test_a_per_call_host_with_an_escape_or_illegal_character_is_refused(
+    url: str, sent: list[str]
+) -> None:
+    error = attempt("openai", {"url": url, "api_key": "sk-test"})
+    assert_refused(error, sent, "private_address_refused", HOST_MESSAGE)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://127.0.0.1./v1",
+        "http://0x7f000001./v1",
+        "http://localhost../v1",
+        "http://169.254.169.254./latest",
+    ],
+)
+def test_a_trailing_dot_is_read_as_the_host_the_client_contacts(url: str, sent: list[str]) -> None:
+    error = attempt("openai", {"url": url, "api_key": "sk-test"})
+    assert_refused(error, sent, "private_address_refused", PRIVATE_MESSAGE)
+
+
+def test_an_empty_written_host_is_a_scheme_error(sent: list[str]) -> None:
+    error = attempt("openai", {"url": "http:///127.0.0.1/v1", "api_key": "sk-test"})
+    assert_refused(error, sent, "scheme_not_allowed", SCHEME_MESSAGE)
+
+
+@pytest.mark.parametrize(
+    ("url", "prefix"),
+    [
+        ("https://gateway.example./v1", "https://gateway.example./v1"),
+        ("https://bücher.example/v1", "https://b"),
+    ],
+)
+def test_a_public_host_with_a_trailing_dot_or_international_name_dispatches(
+    url: str, prefix: str, sent: list[str]
+) -> None:
+    attempt("openai", {"url": url, "api_key": "sk-test"})
+    assert_dispatched(sent, prefix)
+
+
 def test_a_per_call_public_url_dispatches(sent: list[str]) -> None:
     attempt("openai", {"url": "https://gateway.example/v1", "api_key": "sk-test"})
     assert_dispatched(sent, "https://gateway.example/v1/")
@@ -330,7 +398,6 @@ HELPER_PRIVATE = {
     "bare metadata": "http://metadata/v1",
     "instance-data": "http://instance-data/v1",
     "unspecified IPv6": "http://[::]/v1",
-    "scoped IPv6": "http://[fe80::1%25eth0]/v1",
     "6to4 of loopback": "http://[2002:7f00:1::]/v1",
     "an undecodable name": "http://" + chr(0x00DF) * 70 + ".example/v1",
 }
@@ -395,3 +462,25 @@ def test_the_built_in_defaults_the_exemption_uses_are_the_providers_own() -> Non
         ("mistral", MISTRAL),
     ):
         assert prism.registry._built_in_policy(key).configured_url() == default
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://loc\uff0561lhost/",
+        "http://\uff4c\uff4f\uff43\uff05\uff16\uff11\uff4c\uff48\uff4f\uff53\uff54/",
+    ],
+)
+def test_the_helper_refuses_a_host_that_idna_maps_to_an_escape(url: str) -> None:
+    from prism.per_call_url import assert_per_call_url
+
+    with pytest.raises(PrismError) as caught:
+        assert_per_call_url(url)
+    assert caught.value.code == "private_address_refused"
+
+
+def test_the_helper_does_not_resolve_names_known_limit() -> None:
+    from prism.per_call_url import assert_per_call_url
+
+    # A public name that points at loopback is accepted: no DNS is consulted.
+    assert_per_call_url("http://127.0.0.1.nip.io/v1")

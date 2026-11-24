@@ -8,8 +8,19 @@ entry's ``url``) are not checked here: an operator may point those anywhere.
 The rules are spelled identically in the PHP reference
 (``Support\\PerCallUrl``) and prism-ts (``src/internal/per-call-url.ts``). The
 check is synchronous and makes no network or DNS call, so a NAME that resolves
-to a private address is not caught here; a literal address in any spelling an
-OS resolver accepts is. Neither message names the url, host or address.
+to a private address is not caught here: this checks what the url says, and
+does not protect against a caller who chooses a hostname. A literal address in
+the spellings an OS resolver reads is caught. No message names the url, host or
+address.
+
+The host is judged AS WRITTEN and never decoded. Some HTTP clients
+percent-decode a host before they connect, so a check that read the text and a
+client that decoded it would judge different hosts. A host holding anything but
+letters, digits, ``-`` and ``.`` (and, inside brackets, an IPv6 literal's
+``:``) is refused, ``%`` included, and so is a backslash anywhere in the
+authority, which URL parsers split in different places. Trailing dots are
+removed before the address step, because a resolver reads ``localhost.`` as
+``localhost``.
 """
 
 from __future__ import annotations
@@ -28,6 +39,15 @@ PRIVATE_MESSAGE = (
     " address. Allow it in the provider config with allow_private_per_call_url."
 )
 SCHEME_MESSAGE = "A per-call provider url must be an absolute http or https url."
+HOST_MESSAGE = (
+    "A per-call provider url host may hold only letters, digits, hyphens and dots,"
+    " or an IPv6 address in brackets."
+)
+
+# As written: a name (non-ASCII is left to IDNA), or a bracketed IPv6 literal.
+_WRITTEN_HOST = re.compile(r"(?:[A-Za-z0-9.\-\u0080-\U0010ffff]+|\[[A-Za-z0-9.:\-]+\])\Z")
+# After IDNA, lowercasing and trailing dots: ASCII only.
+_CANONICAL_HOST = re.compile(r"[a-z0-9.:\-]+\Z", re.ASCII)
 
 # re.ASCII: under Unicode IGNORECASE, U+017F (long s) would match "s".
 _HTTP = re.compile(r"^https?://", re.IGNORECASE | re.ASCII)
@@ -61,6 +81,30 @@ def _scheme() -> PrismError:
     return PrismError(ErrorCode.SCHEME_NOT_ALLOWED, SCHEME_MESSAGE)
 
 
+def _host() -> PrismError:
+    """The private-address code: a host that cannot be read safely is refused
+    under the rule it might be evading."""
+    return PrismError(ErrorCode.PRIVATE_ADDRESS_REFUSED, HOST_MESSAGE)
+
+
+def _written_host(url: str) -> str | None:
+    """The host exactly as written, or None when the authority holds a backslash.
+
+    The authority runs from after ``//`` to the first ``/``, ``?`` or ``#``;
+    the host follows its last ``@`` and ends at the port's ``:`` (or, when
+    bracketed, at the first ``]``). Nothing is decoded.
+    """
+    rest = url[url.index("//") + 2 :]
+    authority = re.split(r"[/?#]", rest, maxsplit=1)[0]
+    if "\\" in authority:
+        return None
+    host_port = authority.rpartition("@")[2]
+    if host_port.startswith("["):
+        end = host_port.find("]")
+        return host_port if end == -1 else host_port[: end + 1]
+    return host_port.partition(":")[0]
+
+
 def assert_per_call_url(url: str) -> None:
     """Refuse ``url`` when its host is a non-public address or a local name.
 
@@ -73,7 +117,14 @@ def assert_per_call_url(url: str) -> None:
     if not _HTTP.match(url):
         raise _scheme()
 
-    # 2. Parse. The parser's host drops any userinfo.
+    # 2. The host as written, before any parser touches it.
+    written = _written_host(url)
+    if written == "":
+        raise _scheme()
+    if written is None or not _WRITTEN_HOST.match(written):
+        raise _host()
+
+    # 3. Parse. The parser's host drops any userinfo.
     try:
         parts = urlsplit(url)
         host = parts.hostname
@@ -84,7 +135,7 @@ def assert_per_call_url(url: str) -> None:
     if not host:
         raise _scheme()
 
-    # 3. Normalize.
+    # 4. Normalize.
     if host.startswith("[") and host.endswith("]"):
         host = host[1:-1]
     if not host.isascii():
@@ -95,8 +146,11 @@ def assert_per_call_url(url: str) -> None:
     host = host.translate(_ASCII_LOWER).rstrip(".")
     if not host:
         raise _scheme()
+    # Again after IDNA, which can map a non-ASCII character to `%` or `/`.
+    if not _CANONICAL_HOST.match(host):
+        raise _host()
 
-    # 4. IPv6 literal.
+    # 5. IPv6 literal.
     if ":" in host:
         if "%" in host:
             raise _private()
@@ -108,18 +162,18 @@ def assert_per_call_url(url: str) -> None:
             raise _private()
         return
 
-    # 5. IPv4, in every form an OS resolver accepts.
+    # 6. IPv4, in every form an OS resolver accepts.
     labels = host.split(".")
     if _NUMERIC_LAST.match(labels[-1]):
         if not is_public_address(_dotted_quad(labels)):
             raise _private()
         return
 
-    # 6. Local and metadata names.
+    # 7. Local and metadata names.
     if host in _NAMES or host.endswith(".localhost"):
         raise _private()
 
-    # 7. Any other name is allowed; what it resolves to is not checked here.
+    # 8. Any other name is allowed; what it resolves to is not checked here.
 
 
 def _dotted_quad(labels: list[str]) -> str:
