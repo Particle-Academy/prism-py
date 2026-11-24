@@ -195,8 +195,10 @@ endpoint, the entry's key, organization and project are dropped unless the call
 passes its own. Its requests do not follow HTTP redirects, which would carry the
 key to another host; a redirect is reported as an error.
 
-The url must be an absolute `http` or `https` url with a host. Private, loopback
-and link-local addresses are allowed. Every entry is checked before any is
+The entry's url must be an absolute `http` or `https` url with a host. As
+CONFIG it may be a private, loopback or link-local address; a per-call `url` may
+not (see [Per-call urls](#per-call-urls)) unless the entry sets
+`"allow_private_per_call_url": True`. Every entry is checked before any is
 registered, and each of these raises `ValueError` without echoing the url or a
 credential:
 
@@ -206,6 +208,7 @@ credential:
 - a driver other than `openai-compatible` (`not a supported provider driver`);
 - a bad url (`not a valid provider url`);
 - an `api_format` other than `chat_completions` or `responses` (`not a valid api format`);
+- an `allow_private_per_call_url` that is not `True`, `False` or `None`;
 - a credential that is not a string, or contains whitespace or a control character;
 - an unknown field.
 
@@ -236,6 +239,37 @@ a look-alike such as `openai` spelled with a Cyrillic `о`, a full-width
 A `url`, per call or from `OPENAI_URL` / `ANTHROPIC_URL` / `MISTRAL_URL`, that
 contains whitespace or a control character anywhere, including at either end,
 is refused with `ValueError` before any request is made. It is not trimmed.
+
+### Per-call urls
+
+A CONFIG url -- `OPENAI_URL`, `ANTHROPIC_URL`, `MISTRAL_URL`, the provider
+default, or a `configure_providers` entry's `url` -- may point anywhere,
+including `127.0.0.1`. A url passed for a single call may not choose a private
+address: before the provider is built, a per-call `url` is refused with
+`PrismError` code `private_address_refused` when its host is a loopback,
+private (RFC 1918), link-local, CGNAT, unspecified, documentation, multicast or
+reserved address, an IPv4-mapped, NAT64 or 6to4 IPv6 address embedding one of
+those, `localhost` or any `*.localhost`, `localhost.localdomain`,
+`ip6-localhost`, `ip6-loopback`, `metadata`, `metadata.google.internal` or
+`instance-data`. Every IPv4 spelling a resolver accepts is read (`2130706433`,
+`0177.0.0.1`, `0x7f000001`, `127.1`), and one that cannot be read is refused. A
+url that is not absolute `http`/`https` is refused with `scheme_not_allowed`.
+Neither message names the url, host or address. No DNS lookup is made, so a
+hostname that resolves to a private address is not caught here.
+
+A per-call url that is the same endpoint as the configured one is not checked:
+the call is not choosing a new address. A custom provider from
+`register_provider()` has no configured url, so every per-call url it is given
+is checked.
+
+To let calls choose a private address, opt in in config. It is off by default,
+and a per-call `allow_private_per_call_url` key is ignored:
+
+| Provider | Opt-out |
+| --- | --- |
+| Built-in | `OPENAI_ALLOW_PRIVATE_PER_CALL_URL`, `ANTHROPIC_ALLOW_PRIVATE_PER_CALL_URL`, `MISTRAL_ALLOW_PRIVATE_PER_CALL_URL` set to `true` or `(true)`, any case. Any other value leaves it off. |
+| Named compatible | `"allow_private_per_call_url": True` in the `configure_providers` entry |
+| Custom | `register_provider(key, factory, allow_private_per_call_url=True)` |
 
 Anthropic reads `ANTHROPIC_API_KEY`, `ANTHROPIC_URL`, `ANTHROPIC_API_VERSION`
 and canonical `ANTHROPIC_BETA`. Legacy `ANTHROPIC_BETA_FEATURES` is consumed

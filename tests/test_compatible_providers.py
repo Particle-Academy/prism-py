@@ -2,7 +2,8 @@
 
 ``configure_providers`` is this library's equivalent of the reference's
 ``prism.providers.<name>`` config: an operator names an endpoint (vLLM on a
-private address, LM Studio on localhost) and the provider built for it carries
+private address, LM Studio on localhost -- a CONFIG url may be private; a
+per-call one may not, see test_per_call_url.py) and the provider built for it carries
 ONLY that entry's credentials. Nothing from ``OPENAI_*`` or the ``openai``
 provider ever reaches it.
 

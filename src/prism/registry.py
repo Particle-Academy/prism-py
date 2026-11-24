@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 import re
+import sys
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, NamedTuple
 from urllib.parse import urlsplit
 
 from prism.errors import ErrorCode, PrismError
-from prism.providers.config import UNSET, assert_clean_url, same_endpoint
+from prism.per_call_url import assert_per_call_url
+from prism.providers.config import (
+    UNSET,
+    _environment_value,
+    assert_clean_url,
+    configured_string,
+    same_endpoint,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from prism.http import StreamTransport, Transport
@@ -23,7 +31,48 @@ _FACTORIES: dict[str, ProviderFactory] = {}
 _BUILT_INS = ("anthropic", "mistral", "openai")
 
 
-def register_provider(key: str, factory: ProviderFactory, *, replace: bool = False) -> None:
+class _UrlPolicy(NamedTuple):
+    """How a per-call ``url`` is judged for one provider key.
+
+    ``configured_url`` is the CONFIG url a per-call url may repeat without being
+    checked (None: there is none). ``allow_private`` is the operator's opt-out,
+    read from CONFIG only. ``validate`` runs first, so a provider's own url
+    refusal keeps its error.
+    """
+
+    configured_url: Callable[[], str | None]
+    allow_private: Callable[[], bool]
+    validate: Callable[[object], object] | None = None
+
+
+def _no_configured_url() -> str | None:
+    return None
+
+
+def _never() -> bool:
+    return False
+
+
+def _always() -> bool:
+    return True
+
+
+_CUSTOM_POLICY = _UrlPolicy(_no_configured_url, _never)
+_CUSTOM_OPTED_OUT = _UrlPolicy(_no_configured_url, _always)
+
+# key -> (the factory the policy was registered with, the policy). Paired with
+# the factory so a policy never outlives the registration it was made for: a
+# key whose factory has since changed falls back to the custom-provider policy.
+_POLICIES: dict[str, tuple[ProviderFactory, _UrlPolicy]] = {}
+
+
+def register_provider(
+    key: str,
+    factory: ProviderFactory,
+    *,
+    replace: bool = False,
+    allow_private_per_call_url: bool = False,
+) -> None:
     """Teach the builder about a provider key.
 
     A key that is already registered -- a built-in such as ``openai``, or one
@@ -34,10 +83,22 @@ def register_provider(key: str, factory: ProviderFactory, *, replace: bool = Fal
     The key itself must be readable: see :func:`_is_valid_provider_name`. An
     invalid key is refused whether or not ``replace`` is set, and never trimmed.
 
+    A custom provider has no configured url, so every per-call ``url`` it is
+    given is checked before the factory runs: a loopback, private, link-local or
+    metadata address is refused with ``private_address_refused`` unless
+    ``allow_private_per_call_url=True`` (strictly ``True``) is passed here. A
+    replaced built-in is a custom provider: it loses the built-in's
+    configured-url exemption and its environment opt-out.
+
     :raises ValueError: when the key is not a valid provider name, or is taken
         and ``replace`` is not set (a programming error; it carries no Prism
         error code).
     """
+    policy = _CUSTOM_OPTED_OUT if allow_private_per_call_url is True else _CUSTOM_POLICY
+    _register(key, factory, policy, replace=replace)
+
+
+def _register(key: str, factory: ProviderFactory, policy: _UrlPolicy, *, replace: bool) -> None:
     if not _is_valid_provider_name(key):
         raise ValueError(_INVALID_NAME)
     if not replace and _is_registered(key):
@@ -45,6 +106,7 @@ def register_provider(key: str, factory: ProviderFactory, *, replace: bool = Fal
             f"The provider '{key}' is already registered. Pass replace=True to replace it."
         )
     _FACTORIES[key] = factory
+    _POLICIES[key] = (factory, policy)
 
 
 _INVALID_NAME = (
@@ -101,13 +163,75 @@ def resolve_provider(key: str, config: dict[str, Any] | None = None) -> Provider
         )
 
     config = config or {}
-    # Before the factory runs, so a custom provider is held to the same rule.
-    assert_clean_url(config.get("url"))
+    # Before the factory runs, so a custom provider is held to the same rules.
+    url = config.get("url")
+    assert_clean_url(url)
+    if isinstance(url, str):
+        _check_per_call_url(url, _url_policy(key, factory))
     return factory(**config)
 
 
-def _default_factory(key: str) -> ProviderFactory | None:
-    """Built-in providers, imported on first use.
+def _check_per_call_url(url: str, policy: _UrlPolicy) -> None:
+    """Refuse a per-call url that chooses a private address.
+
+    Exempt: the url is the provider's configured endpoint (the call is not
+    choosing a new address), or the opt-out is on in CONFIG. A per-call
+    ``allow_private_per_call_url`` key is never read.
+    """
+    if policy.validate is not None:
+        policy.validate(url)
+    configured = policy.configured_url()
+    if configured is not None and same_endpoint(url, configured):
+        return
+    if policy.allow_private():
+        return
+    assert_per_call_url(url)
+
+
+def _url_policy(key: str, factory: ProviderFactory) -> _UrlPolicy:
+    registered = _POLICIES.get(key)
+    if registered is not None and registered[0] is factory:
+        return registered[1]
+    if key in _BUILT_INS and factory is _built_in(key):
+        return _built_in_policy(key)
+    # Fail closed: no configured url and no opt-out.
+    return _CUSTOM_POLICY
+
+
+# key -> (environment prefix, whether an environment ``null`` url means the
+# default, as Anthropic's does).
+_BUILT_IN_ENVIRONMENT = {
+    "anthropic": ("ANTHROPIC", True),
+    "mistral": ("MISTRAL", False),
+    "openai": ("OPENAI", False),
+}
+
+
+def _built_in_policy(key: str) -> _UrlPolicy:
+    """The environment url (or the provider's DEFAULT_URL), and the env opt-out."""
+    prefix, null_is_default = _BUILT_IN_ENVIRONMENT[key]
+
+    def configured_url() -> str | None:
+        provider = _built_in(key)
+        if provider is None:  # pragma: no cover - key is one of _BUILT_INS
+            return None
+        default = str(sys.modules[provider.__module__].DEFAULT_URL)
+        try:
+            return configured_string(
+                UNSET, f"{prefix}_URL", default, default if null_is_default else None
+            )
+        except TypeError:
+            # An unusable environment url configures no endpoint to exempt.
+            return None
+
+    def allow_private() -> bool:
+        return _environment_value(f"{prefix}_ALLOW_PRIVATE_PER_CALL_URL", False) is True
+
+    return _UrlPolicy(configured_url, allow_private)
+
+
+def _built_in(key: str) -> ProviderFactory | None:
+    """A built-in provider class, imported on first use.
 
     Deferred rather than imported at module level so the builder and the
     providers do not have to import each other at start-up.
@@ -115,22 +239,27 @@ def _default_factory(key: str) -> ProviderFactory | None:
     if key == "anthropic":
         from prism.providers.anthropic.provider import Anthropic
 
-        _FACTORIES["anthropic"] = Anthropic
         return Anthropic
 
     if key == "mistral":
         from prism.providers.mistral.provider import Mistral
 
-        _FACTORIES["mistral"] = Mistral
         return Mistral
 
     if key == "openai":
         from prism.providers.openai.provider import OpenAI
 
-        _FACTORIES["openai"] = OpenAI
         return OpenAI
 
     return None
+
+
+def _default_factory(key: str) -> ProviderFactory | None:
+    """A built-in provider, registered under its key on first use."""
+    factory = _built_in(key)
+    if factory is not None:
+        _FACTORIES[key] = factory
+    return factory
 
 
 # -- named OpenAI-compatible providers ------------------------------------------
@@ -138,7 +267,17 @@ def _default_factory(key: str) -> ProviderFactory | None:
 COMPATIBLE_DRIVER = "openai-compatible"
 
 _API_FORMATS = ("chat_completions", "responses")
-_ENTRY_FIELDS = frozenset({"driver", "url", "api_key", "api_format", "organization", "project"})
+_ENTRY_FIELDS = frozenset(
+    {
+        "driver",
+        "url",
+        "api_key",
+        "api_format",
+        "organization",
+        "project",
+        "allow_private_per_call_url",
+    }
+)
 
 _INVALID_URL = (
     "That is not a valid provider url: a provider url must be an absolute http or https"
@@ -171,6 +310,7 @@ class _Entry(NamedTuple):
     organization: str | None
     project: str | None
     api_format: str
+    allow_private_per_call_url: bool
 
 
 def configure_providers(entries: Mapping[str, Mapping[str, Any]], *, replace: bool = False) -> None:
@@ -178,9 +318,10 @@ def configure_providers(entries: Mapping[str, Mapping[str, Any]], *, replace: bo
 
     The library's equivalent of the reference's ``prism.providers.<name>``
     config. Each entry is ``{"driver": "openai-compatible", "url": ...}`` with
-    optional ``api_key``, ``organization``, ``project`` and ``api_format``
-    (``chat_completions``, the default, or ``responses``). It is then used like
-    any provider: ``Prism.text().using("my-vllm", "model")``.
+    optional ``api_key``, ``organization``, ``project``, ``api_format``
+    (``chat_completions``, the default, or ``responses``) and
+    ``allow_private_per_call_url``. It is then used like any provider:
+    ``Prism.text().using("my-vllm", "model")``.
 
     An entry's provider carries ONLY that entry's credentials. Nothing is read
     from ``OPENAI_*`` or taken from the ``openai`` provider, and a missing or
@@ -195,9 +336,14 @@ def configure_providers(entries: Mapping[str, Mapping[str, Any]], *, replace: bo
     endpoint can never answer to a built-in's name. With ``replace=True`` an
     earlier registration of the same name, in any case, is replaced.
 
-    Private, loopback and link-local urls are accepted: the url is operator
+    The entry's CONFIG url may be private, loopback or link-local: it is operator
     configuration, and the guarded property is that no other credential goes
-    there. No refusal names the url, a credential or a header value.
+    there. A PER-CALL ``url`` is different: one naming a loopback, private,
+    link-local or metadata address other than the entry's own endpoint is
+    refused with ``private_address_refused`` before any request, unless the
+    entry sets ``allow_private_per_call_url: True`` (strictly ``True``; ``None``
+    or ``False`` leave it off). No refusal names the url, a credential or a
+    header value.
 
     :raises ValueError: for an invalid or taken name, an unsupported driver or
         field, an unusable url, an unknown api format, or a credential that is
@@ -230,7 +376,7 @@ def configure_providers(entries: Mapping[str, Mapping[str, Any]], *, replace: bo
         if replace:
             for known in [key for key in _FACTORIES if _ascii_lower(key) == _ascii_lower(name)]:
                 del _FACTORIES[known]
-        register_provider(name, _compatible_factory(entry), replace=replace)
+        _register(name, _compatible_factory(entry), _compatible_policy(entry), replace=replace)
 
 
 def _check_entry(name: str, raw: object) -> _Entry:
@@ -241,7 +387,8 @@ def _check_entry(name: str, raw: object) -> _Entry:
     if any(field not in _ENTRY_FIELDS for field in raw):
         raise ValueError(
             f"The provider entry '{name}' has a field that is not a supported provider entry"
-            " field. The fields are driver, url, api_key, api_format, organization and project."
+            " field. The fields are driver, url, api_key, api_format, organization, project"
+            " and allow_private_per_call_url."
         )
     driver = raw.get("driver")
     if not isinstance(driver, str) or driver != COMPATIBLE_DRIVER:
@@ -252,6 +399,12 @@ def _check_entry(name: str, raw: object) -> _Entry:
 
     url = _http_url(raw.get("url"))
     api_format = raw.get("api_format")
+    allow_private = raw.get("allow_private_per_call_url")
+    if allow_private is not None and not isinstance(allow_private, bool):
+        raise ValueError(
+            f"The provider entry '{name}' field 'allow_private_per_call_url' must be"
+            " True, False or None."
+        )
 
     return _Entry(
         url=url,
@@ -259,6 +412,7 @@ def _check_entry(name: str, raw: object) -> _Entry:
         organization=_credential(name, "organization", raw.get("organization")),
         project=_credential(name, "project", raw.get("project")),
         api_format="chat_completions" if api_format is None else _api_format(api_format),
+        allow_private_per_call_url=allow_private is True,
     )
 
 
@@ -299,6 +453,18 @@ def _credential(name: str, field: str, value: object) -> str | None:
             " whitespace or control characters."
         )
     return value
+
+
+def _compatible_policy(entry: _Entry) -> _UrlPolicy:
+    """A per-call url may repeat the entry's own url; the opt-out is the entry's."""
+
+    def configured_url() -> str | None:
+        return entry.url
+
+    def allow_private() -> bool:
+        return entry.allow_private_per_call_url
+
+    return _UrlPolicy(configured_url, allow_private, _http_url)
 
 
 def _compatible_factory(entry: _Entry) -> ProviderFactory:

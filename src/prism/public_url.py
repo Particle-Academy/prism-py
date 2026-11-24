@@ -74,18 +74,28 @@ _EMBEDDING = (
 )
 
 
-def _assert_public_address(address: str) -> None:
+def is_public_address(address: str) -> bool:
+    """Whether a numeric address is outside every refused range.
+
+    Not a resolver: a name, a malformed literal or a scoped (``%``) IPv6 literal
+    is not public. NAT64 and 6to4 addresses are judged by the IPv4 they embed.
+    """
+    if "%" in address:
+        return False
     try:
         parsed = ipaddress.ip_address(address)
     except ValueError:
-        parsed = None
-    if parsed is not None and "%" not in address and parsed.version == 6:
+        return False
+    if parsed.version == 6:
         for network, offset in _EMBEDDING:
             if parsed in network:
                 embedded = ipaddress.IPv4Address(parsed.packed[offset : offset + 4])
-                _assert_public_address(str(embedded))
-                return
-    if parsed is None or "%" in address or any(parsed in network for network in _BLOCKED):
+                return is_public_address(str(embedded))
+    return not any(parsed in network for network in _BLOCKED)
+
+
+def _assert_public_address(address: str) -> None:
+    if not is_public_address(address):
         raise PrismError(
             ErrorCode.PRIVATE_ADDRESS_REFUSED,
             "A guarded fetch refuses private, reserved or invalid addresses.",

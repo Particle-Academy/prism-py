@@ -113,6 +113,11 @@ def loopback_only(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(socket.socket, "connect", connect)
     for name in ENVIRONMENT_NAMES:
         monkeypatch.delenv(name, raising=False)
+    # The servers are loopback and each case passes its url per call, which is
+    # refused unless the operator opts in, in CONFIG. These cases are about
+    # redirects, not about that refusal (tests/test_per_call_url.py).
+    for prefix in ("OPENAI", "ANTHROPIC", "MISTRAL"):
+        monkeypatch.setenv(f"{prefix}_ALLOW_PRIVATE_PER_CALL_URL", "true")
 
 
 @pytest.fixture
