@@ -702,3 +702,28 @@ def test_a_public_ipv6_literal_with_a_dotted_tail_dispatches(url: str, sent: lis
 def test_an_ipv6_literal_with_a_private_dotted_tail_is_refused(url: str, sent: list[str]) -> None:
     error = attempt("openai", {"url": url, "api_key": "sk-test"})
     assert_refused(error, sent, "private_address_refused", PRIVATE_MESSAGE)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://[2002:808:808::5efe:7f00:1]/v1",
+        "http://[2002:808:808::5efe:169.254.169.254]/latest",
+        "http://[2002:808:808::200:5efe:a9fe:a9fe]/v1",
+        "http://[2606:4700::127.0.0.1.]/v1",
+        "http://[2606:4700::1.]/v1",
+    ],
+)
+def test_isatap_behind_6to4_and_a_bracketed_trailing_dot_are_refused(
+    url: str, sent: list[str]
+) -> None:
+    error = attempt("openai", {"url": url, "api_key": "sk-test"})
+    assert isinstance(error, PrismError)
+    assert error.code == "private_address_refused"
+    assert sent == []
+
+
+def test_isatap_of_a_public_ipv4_behind_6to4_dispatches(sent: list[str]) -> None:
+    url = "http://[2002:808:808::5efe:808:808]/v1"
+    attempt("openai", {"url": url, "api_key": "sk-test"})
+    assert_dispatched(sent, url)
