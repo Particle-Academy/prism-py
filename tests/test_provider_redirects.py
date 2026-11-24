@@ -6,8 +6,9 @@ would hand the key -- ``Authorization``, ``x-api-key``, ``OpenAI-Organization``
 or any other header -- to wherever ``Location`` points.
 
 The default transports therefore follow a redirect only while it stays on the
-request's own origin (scheme, host and port) and return a cross-origin
-redirect as the answer. These cases run the REAL default transports, through
+request's own origin (scheme, host and port), and refuse any other redirect
+with ``redirect_refused`` before the second origin is asked anything, as the
+PHP reference and prism-ts do. These cases run the REAL default transports, through
 the same entry points an application uses, against loopback servers only:
 every other connection is refused by the ``loopback_only`` fixture.
 """
@@ -169,15 +170,13 @@ def test_a_text_call_keeps_its_credentials_off_another_origin(
 ) -> None:
     endpoint.redirect = (status, f"{other.url}/elsewhere")
 
-    _call(
-        lambda: (
-            Prism.text()
-            .using(provider, "fixture-model", _config(provider, endpoint))
-            .with_prompt("hi")
-            .as_text()
-        )
-    )
+    with pytest.raises(PrismError) as raised:
+        Prism.text().using(provider, "fixture-model", _config(provider, endpoint)).with_prompt(
+            "hi"
+        ).as_text()
 
+    assert raised.value.code == "redirect_refused"
+    assert all(secret not in str(raised.value) for secret in SECRETS)
     assert len(endpoint.seen) == 1
     _assert_nothing_reached(other)
 
@@ -248,26 +247,32 @@ def _request(url: str) -> HttpRequest:
     )
 
 
-def test_the_default_transport_returns_a_cross_origin_redirect(
+def _refusal(action: Callable[[], Any]) -> str:
+    with pytest.raises(PrismError) as raised:
+        action()
+    assert all(secret not in str(raised.value) for secret in SECRETS)
+    return raised.value.code
+
+
+def test_the_default_transport_refuses_a_cross_origin_redirect(
     endpoint: Server, other: Server
 ) -> None:
     endpoint.redirect = (302, f"{other.url}/elsewhere")
 
-    response = UrllibTransport().send(_request(f"{endpoint.url}/v1/x"))
+    code = _refusal(lambda: UrllibTransport().send(_request(f"{endpoint.url}/v1/x")))
 
-    assert response.status == 302
+    assert code == "redirect_refused"
     _assert_nothing_reached(other)
 
 
-def test_the_default_stream_transport_returns_a_cross_origin_redirect(
+def test_the_default_stream_transport_refuses_a_cross_origin_redirect(
     endpoint: Server, other: Server
 ) -> None:
     endpoint.redirect = (302, f"{other.url}/elsewhere")
 
-    response = UrllibStreamTransport().stream(_request(f"{endpoint.url}/v1/x"))
-    list(response.chunks)
+    code = _refusal(lambda: UrllibStreamTransport().stream(_request(f"{endpoint.url}/v1/x")))
 
-    assert response.status == 302
+    assert code == "redirect_refused"
     _assert_nothing_reached(other)
 
 
@@ -275,10 +280,80 @@ def test_a_scheme_change_is_another_origin(endpoint: Server) -> None:
     port = endpoint.url.rsplit(":", 1)[1]
     endpoint.redirect = (302, f"https://127.0.0.1:{port}/landed")
 
+    code = _refusal(lambda: UrllibTransport().send(_request(f"{endpoint.url}/v1/x")))
+
+    assert code == "redirect_refused"
+    assert len(endpoint.seen) == 1
+
+
+@pytest.mark.parametrize("location", ["ftp://127.0.0.1/landed", "file:///etc/passwd"])
+def test_a_redirect_to_another_scheme_is_refused(endpoint: Server, location: str) -> None:
+    endpoint.redirect = (302, location)
+
+    code = _refusal(lambda: UrllibTransport().send(_request(f"{endpoint.url}/v1/x")))
+
+    assert code == "redirect_refused"
+    assert len(endpoint.seen) == 1
+
+
+@pytest.mark.parametrize("status", [307, 308])
+def test_a_same_origin_307_or_308_keeps_the_method_and_body(endpoint: Server, status: int) -> None:
+    endpoint.redirect = (status, f"{endpoint.url}/landed")
+
     response = UrllibTransport().send(_request(f"{endpoint.url}/v1/x"))
 
-    assert response.status == 302
-    assert len(endpoint.seen) == 1
+    assert response.status == 400
+    assert [(method, path) for method, path, _ in endpoint.seen] == [
+        ("POST", "/v1/x"),
+        ("POST", "/landed"),
+    ]
+    assert endpoint.seen[1][2].get("Content-Length") == "2"
+    assert endpoint.seen[1][2].get("Authorization") == f"Bearer {KEY}"
+
+
+@pytest.mark.parametrize("status", [301, 302, 303])
+def test_a_same_origin_post_redirect_becomes_a_get_without_a_body(
+    endpoint: Server, status: int
+) -> None:
+    endpoint.redirect = (status, f"{endpoint.url}/landed")
+
+    response = UrllibTransport().send(_request(f"{endpoint.url}/v1/x"))
+
+    assert response.status == 400
+    assert [(method, path) for method, path, _ in endpoint.seen] == [
+        ("POST", "/v1/x"),
+        ("GET", "/landed"),
+    ]
+    assert "Content-Length" not in endpoint.seen[1][2]
+
+
+def test_more_than_ten_same_origin_redirects_are_refused(endpoint: Server) -> None:
+    endpoint.redirect = (307, "/v1/again")
+
+    code = _refusal(lambda: UrllibTransport().send(_request(f"{endpoint.url}/v1/x")))
+
+    assert code == "too_many_redirects"
+    assert len(endpoint.seen) == 11
+
+
+@pytest.mark.parametrize("status", [307, 308])
+@pytest.mark.parametrize("provider", PROVIDERS)
+def test_a_text_call_follows_a_same_origin_307_or_308(
+    provider: str, status: int, endpoint: Server
+) -> None:
+    endpoint.redirect = (status, f"{endpoint.url}/landed")
+
+    _call(
+        lambda: (
+            Prism.text()
+            .using(provider, "fixture-model", _config(provider, endpoint))
+            .with_prompt("hi")
+            .as_text()
+        )
+    )
+
+    assert [method for method, _, _ in endpoint.seen] == ["POST", "POST"]
+    assert endpoint.seen[1][1] == "/landed"
 
 
 def test_a_same_origin_redirect_is_still_followed(endpoint: Server) -> None:
@@ -300,3 +375,14 @@ def test_a_relative_redirect_stays_on_the_origin(endpoint: Server) -> None:
 
     assert response.status == 400
     assert [path for _, path, _ in endpoint.seen] == ["/v1/x", "/landed"]
+
+
+@pytest.mark.parametrize("userinfo", ["evil.example@", "user:secret@"])
+def test_a_same_origin_location_with_userinfo_is_refused(endpoint: Server, userinfo: str) -> None:
+    host_port = endpoint.url.split("://", 1)[1]
+    endpoint.redirect = (302, f"http://{userinfo}{host_port}/landed")
+
+    code = _refusal(lambda: UrllibTransport().send(_request(f"{endpoint.url}/v1/x")))
+
+    assert code == "redirect_refused"
+    assert len(endpoint.seen) == 1

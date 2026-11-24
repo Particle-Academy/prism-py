@@ -86,13 +86,13 @@ def servers(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[Server, Server]]:
         thief.close()
 
 
-def test_a_text_call_does_not_follow_a_redirect(servers: tuple[Server, Server]) -> None:
+def test_a_text_call_refuses_a_cross_origin_redirect(servers: tuple[Server, Server]) -> None:
     endpoint, thief = servers
 
     with pytest.raises(PrismError) as raised:
         Prism.text().using("my-vllm", "m").with_prompt("hi").as_text()
 
-    assert raised.value.code == "provider_response_error"
+    assert raised.value.code == "redirect_refused"
     assert [(method, path) for method, path, _ in endpoint.seen] == [
         ("POST", "/v1/chat/completions")
     ]
@@ -101,13 +101,13 @@ def test_a_text_call_does_not_follow_a_redirect(servers: tuple[Server, Server]) 
     assert KEY not in str(raised.value)
 
 
-def test_a_stream_does_not_follow_a_redirect(servers: tuple[Server, Server]) -> None:
+def test_a_stream_refuses_a_cross_origin_redirect(servers: tuple[Server, Server]) -> None:
     endpoint, thief = servers
 
     with pytest.raises(PrismError) as raised:
         list(Prism.text().using("my-vllm", "m").with_prompt("hi").as_stream())
 
-    assert raised.value.code == "provider_response_error"
+    assert raised.value.code == "redirect_refused"
     assert KEY not in str(raised.value)
 
     assert [(method, path) for method, path, _ in endpoint.seen] == [

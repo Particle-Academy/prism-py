@@ -178,10 +178,10 @@ class OpenAI(Provider):
         path does not go through the constructor at all. A missing or empty
         key, organization or project sends no header.
 
-        Redirects are NOT followed. urllib re-sends the Authorization header to
-        wherever a 301, 302 or 303 points, so following one would hand the
-        entry's key to a host nobody configured. A redirect comes back as a
-        response and is reported as an error.
+        The default transports follow a redirect only within the request's
+        origin and refuse any other with ``redirect_refused``, so the entry's
+        key never reaches a host nobody configured. A transport passed in is
+        asked never to follow one, because it may not keep that rule.
         """
         provider = cls.__new__(cls)
         provider.url = url.rstrip("/")
@@ -190,8 +190,12 @@ class OpenAI(Provider):
         provider.project = project or None
         provider.api_format = api_format
         provider.timeout = timeout
-        provider._transport = _NoRedirects(transport or UrllibTransport())
-        provider._stream_transport = _NoStreamRedirects(stream_transport or UrllibStreamTransport())
+        provider._transport = UrllibTransport() if transport is None else _NoRedirects(transport)
+        provider._stream_transport = (
+            UrllibStreamTransport()
+            if stream_transport is None
+            else _NoStreamRedirects(stream_transport)
+        )
         return provider
 
     def text(self, request: Request) -> Response:
