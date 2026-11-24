@@ -1,4 +1,4 @@
-"""The OpenAI provider, Responses API only."""
+"""The OpenAI provider: the Responses API, or chat completions by ``api_format``."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import json
 import uuid
 from collections.abc import Iterator
 from contextlib import closing
+from dataclasses import replace
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -35,6 +36,8 @@ from prism.files.request import (
 from prism.http import (
     DEFAULT_TIMEOUT,
     HttpRequest,
+    HttpResponse,
+    HttpStreamResponse,
     MultipartBody,
     StreamTransport,
     Transport,
@@ -70,6 +73,14 @@ from prism.providers.openai.batch import (
     parse_batch_list_response,
     parse_batch_results,
 )
+from prism.providers.openai.chat_completions import (
+    build_chat_request_body,
+    build_chat_stream_body,
+    build_chat_structured_body,
+    parse_chat_response,
+    with_json_instruction,
+)
+from prism.providers.openai.chat_stream import ChatCompletionsStreamMapper
 from prism.providers.openai.embeddings import build_embeddings_body, parse_embeddings_response
 from prism.providers.openai.files import (
     build_list_query,
@@ -97,13 +108,22 @@ __all__ = ["OpenAI"]
 
 DEFAULT_URL = "https://api.openai.com/v1"
 
+#: The formats this provider speaks. Anything else is refused when it is used.
+CHAT_COMPLETIONS = "chat_completions"
+RESPONSES = "responses"
+
 
 class OpenAI(Provider):
-    """Talks to OpenAI's Responses API.
+    """Talks to OpenAI's Responses API, or to chat completions.
+
+    ``api_format`` picks the wire format for text, structured and stream:
+    ``responses`` (the default) or ``chat_completions``. Every other capability
+    has one endpoint and ignores it.
 
     Configuration comes from explicit constructor arguments, falling back to
     ``OPENAI_API_KEY`` / ``OPENAI_URL`` / ``OPENAI_ORGANIZATION`` /
-    ``OPENAI_PROJECT`` / ``OPENAI_API_FORMAT``.
+    ``OPENAI_PROJECT`` / ``OPENAI_API_FORMAT``. A named OpenAI-compatible
+    provider is built by :meth:`from_entry` instead, which reads NONE of them.
 
     ``transport`` is injectable so nothing here has to reach the network in a
     test.
@@ -136,7 +156,49 @@ class OpenAI(Provider):
         self._transport: Transport = transport or UrllibTransport()
         self._stream_transport: StreamTransport = stream_transport or UrllibStreamTransport()
 
+    @classmethod
+    def from_entry(
+        cls,
+        *,
+        url: str,
+        api_key: str | None,
+        organization: str | None,
+        project: str | None,
+        api_format: str,
+        transport: Transport | None = None,
+        stream_transport: StreamTransport | None = None,
+        timeout: float | None = None,
+    ) -> OpenAI:
+        """A provider configured by these values ALONE, never by the environment.
+
+        The constructor fills every absent value from ``OPENAI_*``, and an
+        explicit url equal to ``OPENAI_URL`` inherits the environment's key.
+        Both are right for ``openai`` and wrong for a named compatible endpoint,
+        whose credentials must be its own entry's and nothing else -- so this
+        path does not go through the constructor at all. A missing or empty
+        key, organization or project sends no header.
+
+        Redirects are NOT followed. urllib re-sends the Authorization header to
+        wherever a 301, 302 or 303 points, so following one would hand the
+        entry's key to a host nobody configured. A redirect comes back as a
+        response and is reported as an error.
+        """
+        provider = cls.__new__(cls)
+        provider.url = url.rstrip("/")
+        provider.api_key = api_key or ""
+        provider.organization = organization or None
+        provider.project = project or None
+        provider.api_format = api_format
+        provider.timeout = timeout
+        provider._transport = _NoRedirects(transport or UrllibTransport())
+        provider._stream_transport = _NoStreamRedirects(stream_transport or UrllibStreamTransport())
+        return provider
+
     def text(self, request: Request) -> Response:
+        if self.api_format == CHAT_COMPLETIONS:
+            decoded, headers = self._chat_send(build_chat_request_body(request), request)
+            return parse_chat_response(request, decoded, parse_rate_limits(headers))
+
         return self._send(build_request_body(request), request, "text")
 
     def stream(self, request: Request) -> Iterator[StreamEvent]:
@@ -146,17 +208,22 @@ class OpenAI(Provider):
         builds, so the two cannot drift apart into different requests that
         merely look alike.
         """
-        if self.api_format != "responses":
+        chat = self.api_format == CHAT_COMPLETIONS
+        if not chat and self.api_format != RESPONSES:
             self._unsupported(f"stream via the {self.api_format} API")
 
-        payload = {**build_request_body(request), "stream": True}
+        payload = (
+            build_chat_stream_body(request)
+            if chat
+            else {**build_request_body(request), "stream": True}
+        )
         body = canonical.encode(payload).encode("utf-8")
         headers = {**self._headers(len(body)), "Accept": "text/event-stream"}
 
         response = self._stream_transport.stream(
             HttpRequest(
                 method="POST",
-                url=f"{self.url}/responses",
+                url=f"{self.url}/chat/completions" if chat else f"{self.url}/responses",
                 headers=headers,
                 body=body,
                 timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
@@ -164,7 +231,8 @@ class OpenAI(Provider):
             )
         )
 
-        if response.status >= 400:
+        # 3xx too: a provider that does not follow redirects sees one as a response.
+        if response.status >= 300:
             # An error response is not an event stream; the message inside it is
             # the only useful thing about this call.
             text = "".join(response.chunks)
@@ -175,7 +243,31 @@ class OpenAI(Provider):
                 body=text,
             )
 
+        if chat:
+            return self._chat_events(response.chunks, request.model)
+
         return self._events(response.chunks)
+
+    def _chat_events(self, chunks: Iterator[str], model: str) -> Iterator[StreamEvent]:
+        """One mapper per stream; it holds half-assembled text and tool calls."""
+        mapper = ChatCompletionsStreamMapper(model)
+
+        with closing(failure_aware_sse(chunks, mapper.failure_usage)) as payloads:
+            for payload in payloads:
+                if isinstance(payload, ErrorEvent):
+                    # The transport failed mid-stream: there is no end to report.
+                    yield payload
+                    return
+                # The stream closes with a literal `[DONE]`, which is not JSON.
+                if payload == "[DONE]":
+                    break
+                parsed = _stream_loads(payload)
+                if parsed is None:
+                    yield mapper.decode_failure()
+                    return
+                yield from mapper.map(parsed)
+
+        yield from mapper.finish()
 
     def _events(self, chunks: Iterator[str]) -> Iterator[StreamEvent]:
         failure = StreamFailureUsageTracker("openai")
@@ -574,7 +666,7 @@ class OpenAI(Provider):
         endpoint, the headers, the timeout and the error mapping are decided
         once.
         """
-        if self.api_format != "responses":
+        if self.api_format != RESPONSES:
             self._unsupported(f"{action} via the {self.api_format} API")
 
         body = canonical.encode(payload).encode("utf-8")
@@ -609,12 +701,66 @@ class OpenAI(Provider):
         The reply is parsed by the TEXT parser and then given its structured
         reading, so finish reasons, token-limit failures, usage and rate limits
         behave identically on both paths by construction.
+
+        On chat completions it is JSON mode with the schema in a system message
+        appended after the conversation, as the reference sends it.
         """
+        if self.api_format == CHAT_COMPLETIONS:
+            instructed = with_json_instruction(request)
+            decoded, headers = self._chat_send(build_chat_structured_body(instructed), instructed)
+            return structured_from_text_response(
+                parse_chat_response(
+                    instructed, decoded, parse_rate_limits(headers), structured=True
+                ),
+                assistant_additional_content=False,
+            )
+
         return structured_from_text_response(
             self._send(build_structured_body(request), request), parsed_step=True
         )
 
     # -- internals ---------------------------------------------------------
+
+    def _chat_send(
+        self, payload: dict[str, Any], request: Request
+    ) -> tuple[dict[str, Any], dict[str, str]]:
+        """One round trip to ``chat/completions``: the decoded body and the headers.
+
+        The body is built by the caller BEFORE this runs, so a conversation that
+        cannot be mapped (unusable tool-call arguments) fails with nothing sent.
+        """
+        body = canonical.encode(payload).encode("utf-8")
+        response = self._transport.send(
+            HttpRequest(
+                method="POST",
+                url=f"{self.url}/chat/completions",
+                headers=self._headers(len(body)),
+                body=body,
+                timeout=self.timeout if self.timeout is not None else DEFAULT_TIMEOUT,
+                client_options=request.client_options,
+            )
+        )
+
+        # 3xx too, and before decoding: a provider that does not follow
+        # redirects sees one as a response, and its body is not an answer.
+        if 300 <= response.status < 400:
+            raise PrismError.provider_response_error(
+                f"OpenAI error [{response.status}]: the endpoint answered with a redirect,"
+                " which is not followed.",
+                status=response.status,
+            )
+
+        decoded = self._decode(response.status, response.body)
+
+        if response.status >= 400:
+            raise PrismError.provider_response_error(
+                f"OpenAI error [{response.status}]: "
+                f"{data_get(decoded, 'error.message', 'unknown')}",
+                status=response.status,
+                body=response.body.decode("utf-8", errors="replace"),
+            )
+
+        return decoded, response.headers
 
     def _headers(self, content_length: int) -> dict[str, str]:
         headers = {
@@ -649,6 +795,26 @@ class OpenAI(Provider):
             )
 
         return decoded
+
+
+class _NoRedirects:
+    """Sends every request with ``follow_redirects=False``."""
+
+    def __init__(self, inner: Transport) -> None:
+        self._inner = inner
+
+    def send(self, request: HttpRequest) -> HttpResponse:
+        return self._inner.send(replace(request, follow_redirects=False))
+
+
+class _NoStreamRedirects:
+    """Streams every request with ``follow_redirects=False``."""
+
+    def __init__(self, inner: StreamTransport) -> None:
+        self._inner = inner
+
+    def stream(self, request: HttpRequest) -> HttpStreamResponse:
+        return self._inner.stream(replace(request, follow_redirects=False))
 
 
 def _loads(text: str) -> dict[str, Any]:

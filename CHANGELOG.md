@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `configure_providers(entries, *, replace=False)` registers named OpenAI-compatible providers (`driver: "openai-compatible"`, `url`, optional `api_key`, `organization`, `project`, `api_format`). Each one uses only its own entry's credentials. It never reads `OPENAI_*` and never takes the `openai` provider's config. With no key it sends no `Authorization` header. A per-call url for a different endpoint drops the entry's credentials unless the call passes its own. Names, drivers, urls (absolute http/https only; private addresses allowed), api formats and credentials are all checked before anything is registered. (G-321 A)
+- OpenAI `api_format: "chat_completions"` is implemented for text, structured and stream, posting to `<url>/chat/completions`. Request bodies match the PHP reference byte for byte. A reply that finished on tool calls is refused with `tool_loop_not_supported` before any second request. Tool-call arguments that are not a JSON object are refused at mapping, and when read from a streamed call. A refusal from the model raises `provider_response_error`. (G-321 D)
+- A named compatible provider does not follow HTTP redirects. urllib re-sends the `Authorization` header to wherever a 301, 302 or 303 points, so following one would send the entry's key to a host nobody configured. A redirect is reported as `provider_response_error`.
+- On chat completions, a user message carrying a document, audio or video part is refused with `unsupported_media`. The reference drops these parts without saying so.
+- A stream that ends without a finish reason reports `unknown`, not `stop`.
+
 ## 0.11.0 — 2026-11-23
 
 BREAKING CHANGE: `ToolCall.decoded_arguments()` raises `malformed_tool_call_arguments` for a number, string, boolean, non-empty list or integer-keyed map. It used to return an empty dict for the first four. An empty string, the text `0`, `null`, `[]` and `{}` still mean no arguments. Code that reads the arguments before running a tool should catch the error and return it to the model as a tool error, or check `has_malformed_arguments()` first.

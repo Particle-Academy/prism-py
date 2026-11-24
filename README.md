@@ -159,8 +159,58 @@ Environment strings follow Laravel's reserved spellings: case-insensitive
 `null`, `true`, `false`, `empty` and their parenthesized forms become scalars;
 matching surrounding quotes are removed. Direct constructor strings remain
 literal. Non-string environment scalars are refused for string-only fields.
-Only OpenAI's Responses format is implemented; another format still raises
+OpenAI's `api_format` is `responses` (the default) or `chat_completions`, which
+posts text, structured and stream calls to `<url>/chat/completions`. Structured
+output on chat completions is JSON mode, with the schema in a system message,
+as the PHP reference sends it. Any other format raises
 `unsupported_provider_action` before HTTP.
+
+### Named OpenAI-compatible providers
+
+`configure_providers()` names an OpenAI-compatible endpoint (vLLM, LM Studio, a
+gateway) and makes it a provider like any other:
+
+```python
+from prism import Prism, configure_providers
+
+configure_providers({
+    "my-vllm": {
+        "driver": "openai-compatible",
+        "url": "http://10.0.0.5:8000/v1",
+        "api_key": vllm_key,              # optional
+        "api_format": "chat_completions",  # the default; or "responses"
+        "organization": None,              # optional
+        "project": None,                   # optional
+    },
+})
+
+Prism.text().using("my-vllm", "meta-llama/Llama-3.1-8B-Instruct").with_prompt("Hi").as_text()
+```
+
+The provider uses only its own entry's credentials. It never reads
+`OPENAI_API_KEY`, `OPENAI_ORGANIZATION`, `OPENAI_PROJECT`, `OPENAI_URL` or
+`OPENAI_API_FORMAT`, or takes anything from the `openai` provider. With no key it
+sends no `Authorization` header. If a per-call `url` points at a different
+endpoint, the entry's key, organization and project are dropped unless the call
+passes its own. Its requests do not follow HTTP redirects, which would carry the
+key to another host; a redirect is reported as an error.
+
+The url must be an absolute `http` or `https` url with a host. Private, loopback
+and link-local addresses are allowed. Every entry is checked before any is
+registered, and each of these raises `ValueError` without echoing the url or a
+credential:
+
+- a name outside `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` (`not a valid provider name`);
+- a name equal to a built-in or an earlier registration in any ASCII case
+  (`already registered`); built-in names are refused even with `replace=True`;
+- a driver other than `openai-compatible` (`not a supported provider driver`);
+- a bad url (`not a valid provider url`);
+- an `api_format` other than `chat_completions` or `responses` (`not a valid api format`);
+- a credential that is not a string, or contains whitespace or a control character;
+- an unknown field.
+
+The name you pass to `using()` is the provider key on the request; nothing
+relabels it `openai`.
 
 Credentials are scoped to their configured endpoint. Environment credentials
 (`*_API_KEY`, and OpenAI's `OPENAI_ORGANIZATION` / `OPENAI_PROJECT`) are used

@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING, Any, NamedTuple
+from urllib.parse import urlsplit
 
 from prism.errors import ErrorCode, PrismError
-from prism.providers.config import assert_clean_url
+from prism.providers.config import UNSET, assert_clean_url, same_endpoint
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from prism.http import StreamTransport, Transport
     from prism.providers.base import Provider
 
-__all__ = ["register_provider", "resolve_provider"]
+__all__ = ["configure_providers", "register_provider", "resolve_provider"]
 
 ProviderFactory = Callable[..., "Provider"]
 
@@ -37,16 +39,19 @@ def register_provider(key: str, factory: ProviderFactory, *, replace: bool = Fal
         error code).
     """
     if not _is_valid_provider_name(key):
-        raise ValueError(
-            "That is not a valid provider name: a provider name must start with an"
-            ' ASCII letter or digit, contain only ASCII letters, digits, ".", "_"'
-            ' and "-", and be at most 64 characters long.'
-        )
+        raise ValueError(_INVALID_NAME)
     if not replace and _is_registered(key):
         raise ValueError(
             f"The provider '{key}' is already registered. Pass replace=True to replace it."
         )
     _FACTORIES[key] = factory
+
+
+_INVALID_NAME = (
+    "That is not a valid provider name: a provider name must start with an"
+    ' ASCII letter or digit, contain only ASCII letters, digits, ".", "_"'
+    ' and "-", and be at most 64 characters long.'
+)
 
 
 # A provider key: ASCII, starting with a letter or digit, at most 64
@@ -126,3 +131,218 @@ def _default_factory(key: str) -> ProviderFactory | None:
         return OpenAI
 
     return None
+
+
+# -- named OpenAI-compatible providers ------------------------------------------
+
+COMPATIBLE_DRIVER = "openai-compatible"
+
+_API_FORMATS = ("chat_completions", "responses")
+_ENTRY_FIELDS = frozenset({"driver", "url", "api_key", "api_format", "organization", "project"})
+
+_INVALID_URL = (
+    "That is not a valid provider url: a provider url must be an absolute http or https"
+    " url with a host."
+)
+
+# Every Cc control, every Unicode White_Space codepoint and the G-36
+# zero-widths. A credential carrying one cannot be a header value, and the HTTP
+# stack's own refusal would quote the value -- the key -- in its message.
+_CREDENTIAL_FORBIDDEN = frozenset(
+    [
+        *range(0x0000, 0x0020 + 1),
+        *range(0x007F, 0x009F + 1),
+        0x00A0,
+        0x1680,
+        *range(0x2000, 0x200D + 1),
+        0x2028,
+        0x2029,
+        0x202F,
+        0x205F,
+        0x3000,
+        0xFEFF,
+    ]
+)
+
+
+class _Entry(NamedTuple):
+    url: str
+    api_key: str | None
+    organization: str | None
+    project: str | None
+    api_format: str
+
+
+def configure_providers(entries: Mapping[str, Mapping[str, Any]], *, replace: bool = False) -> None:
+    """Register named OpenAI-compatible providers (vLLM, LM Studio, a gateway).
+
+    The library's equivalent of the reference's ``prism.providers.<name>``
+    config. Each entry is ``{"driver": "openai-compatible", "url": ...}`` with
+    optional ``api_key``, ``organization``, ``project`` and ``api_format``
+    (``chat_completions``, the default, or ``responses``). It is then used like
+    any provider: ``Prism.text().using("my-vllm", "model")``.
+
+    An entry's provider carries ONLY that entry's credentials. Nothing is read
+    from ``OPENAI_*`` or taken from the ``openai`` provider, and a missing or
+    empty key sends no ``Authorization`` header at all. A per-call ``url`` that
+    names a different endpoint drops the entry's key, organization and project
+    unless the call supplies its own.
+
+    Every entry is checked before ANY is registered, so a refused call changes
+    nothing. Names follow :func:`register_provider`'s rules and are compared
+    ASCII case-insensitively. A built-in name (``openai``, ``OpenAI``,
+    ``ANTHROPIC``...) is refused even with ``replace=True``, so a configured
+    endpoint can never answer to a built-in's name. With ``replace=True`` an
+    earlier registration of the same name, in any case, is replaced.
+
+    Private, loopback and link-local urls are accepted: the url is operator
+    configuration, and the guarded property is that no other credential goes
+    there. No refusal names the url, a credential or a header value.
+
+    :raises ValueError: for an invalid or taken name, an unsupported driver or
+        field, an unusable url, an unknown api format, or a credential that is
+        not a clean string.
+    """
+    checked: list[tuple[str, _Entry]] = []
+    names: set[str] = set()
+
+    for name, raw in entries.items():
+        if not _is_valid_provider_name(name):
+            raise ValueError(_INVALID_NAME)
+        folded = _ascii_lower(name)
+        if folded in _BUILT_INS:
+            raise ValueError(
+                f"The provider '{name}' is already registered as a built-in provider;"
+                " an openai-compatible provider cannot take a built-in name."
+            )
+        if folded in names:
+            raise ValueError(
+                f"The provider '{name}' is already registered by another entry in the same call."
+            )
+        if not replace and _is_registered(name):
+            raise ValueError(
+                f"The provider '{name}' is already registered. Pass replace=True to replace it."
+            )
+        names.add(folded)
+        checked.append((name, _check_entry(name, raw)))
+
+    for name, entry in checked:
+        if replace:
+            for known in [key for key in _FACTORIES if _ascii_lower(key) == _ascii_lower(name)]:
+                del _FACTORIES[known]
+        register_provider(name, _compatible_factory(entry), replace=replace)
+
+
+def _check_entry(name: str, raw: object) -> _Entry:
+    if not isinstance(raw, Mapping):
+        raise ValueError(
+            f"The provider entry '{name}' is not a supported provider entry: it must be a mapping."
+        )
+    if any(field not in _ENTRY_FIELDS for field in raw):
+        raise ValueError(
+            f"The provider entry '{name}' has a field that is not a supported provider entry"
+            " field. The fields are driver, url, api_key, api_format, organization and project."
+        )
+    driver = raw.get("driver")
+    if not isinstance(driver, str) or driver != COMPATIBLE_DRIVER:
+        raise ValueError(
+            f"That is not a supported provider driver: the provider entry '{name}' must use"
+            f" the driver '{COMPATIBLE_DRIVER}'."
+        )
+
+    url = _http_url(raw.get("url"))
+    api_format = raw.get("api_format")
+
+    return _Entry(
+        url=url,
+        api_key=_credential(name, "api_key", raw.get("api_key")),
+        organization=_credential(name, "organization", raw.get("organization")),
+        project=_credential(name, "project", raw.get("project")),
+        api_format="chat_completions" if api_format is None else _api_format(api_format),
+    )
+
+
+def _http_url(url: object) -> str:
+    """An absolute ``http``/``https`` url with a host and no whitespace or controls."""
+    if not isinstance(url, str):
+        raise ValueError(_INVALID_URL)
+    assert_clean_url(url)
+    try:
+        parts = urlsplit(url)
+        parts.port  # noqa: B018 - parsing the port is the check
+    except ValueError:
+        # Not chained: the parser's own message quotes the url.
+        raise ValueError(_INVALID_URL) from None
+    if parts.scheme.lower() not in ("http", "https") or not parts.hostname:
+        raise ValueError(_INVALID_URL)
+    return url
+
+
+def _api_format(value: object) -> str:
+    if not isinstance(value, str) or value not in _API_FORMATS:
+        raise ValueError(
+            "That is not a valid api format: an openai-compatible provider speaks"
+            " 'chat_completions' or 'responses'."
+        )
+    return value
+
+
+def _credential(name: str, field: str, value: object) -> str | None:
+    """None, or a string with no whitespace or control character. Never echoed."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"The provider entry '{name}' field '{field}' must be a string or None.")
+    if any(ord(char) in _CREDENTIAL_FORBIDDEN for char in value):
+        raise ValueError(
+            f"The provider entry '{name}' field '{field}' must be a string without"
+            " whitespace or control characters."
+        )
+    return value
+
+
+def _compatible_factory(entry: _Entry) -> ProviderFactory:
+    """What ``using(name, model, config)`` calls: the entry, overridden per call."""
+
+    def build(
+        url: object = UNSET,
+        api_key: object = UNSET,
+        organization: object = UNSET,
+        project: object = UNSET,
+        api_format: object = UNSET,
+        transport: Transport | None = None,
+        stream_transport: StreamTransport | None = None,
+        timeout: float | None = None,
+    ) -> Provider:
+        from prism.providers.openai.provider import OpenAI
+
+        resolved_url = entry.url
+        key, organization_id, project_id = entry.api_key, entry.organization, entry.project
+
+        if url is not UNSET:
+            resolved_url = _http_url(url)
+            # The entry's credentials belong to the entry's endpoint only.
+            if not same_endpoint(resolved_url, entry.url):
+                key = organization_id = project_id = None
+
+        if api_key is not UNSET:
+            key = _credential("per-call", "api_key", api_key)
+        if organization is not UNSET:
+            organization_id = _credential("per-call", "organization", organization)
+        if project is not UNSET:
+            project_id = _credential("per-call", "project", project)
+
+        return OpenAI.from_entry(
+            url=resolved_url,
+            api_key=key,
+            organization=organization_id,
+            project=project_id,
+            api_format=entry.api_format
+            if api_format is UNSET or api_format is None
+            else _api_format(api_format),
+            transport=transport,
+            stream_transport=stream_transport,
+            timeout=timeout,
+        )
+
+    return build
