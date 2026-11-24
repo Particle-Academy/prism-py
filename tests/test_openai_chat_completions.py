@@ -601,6 +601,48 @@ def test_a_streamed_tool_call_is_assembled_and_never_run(wire: Wire) -> None:
     assert len(wire.requests) == 1
 
 
+@pytest.mark.parametrize("split", [False, True], ids=["whole-call", "last-fragment"])
+def test_a_tool_call_in_the_finish_chunk_is_kept(wire: Wire, split: bool) -> None:
+    # Some servers send the last fragment and finish_reason "tool_calls" in one
+    # chunk. The PHP reference used to drop the calls there and end as stop.
+    opening = {
+        "index": 0,
+        "id": "call_1",
+        "type": "function",
+        "function": {"name": "delete_file", "arguments": '{"pa' if split else '{"path":"a.txt"}'},
+    }
+    wire.stream_frames = (
+        frames(
+            chunk({"tool_calls": [opening]}),
+            chunk(
+                {"tool_calls": [{"index": 0, "function": {"arguments": 'th":"a.txt"}'}}]},
+                "tool_calls",
+            ),
+        )
+        if split
+        else frames(chunk({"tool_calls": [opening]}, "tool_calls"))
+    )
+
+    events = list(
+        Prism.text()
+        .using("my-vllm", "m")
+        .with_tools([delete_file()])
+        .with_max_steps(3)
+        .with_prompt("Delete a.txt.")
+        .as_stream()
+    )
+
+    calls = [event.tool_call for event in events if isinstance(event, ToolCallEvent)]
+    assert len(calls) == 1
+    assert calls[0] is not None
+    assert calls[0].id == "call_1"
+    assert calls[0].decoded_arguments() == {"path": "a.txt"}
+    end = events[-1]
+    assert isinstance(end, StreamEndEvent)
+    assert end.finish_reason is FinishReason.TOOL_CALLS
+    assert len(wire.requests) == 1
+
+
 @pytest.mark.parametrize(
     "fragments", [['{"path":', ' "a.txt"'], ["[1,", "2]"], ["42"]], ids=["cut", "list", "number"]
 )
