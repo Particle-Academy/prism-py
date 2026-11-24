@@ -12,15 +12,17 @@ import codecs
 import ipaddress
 import math
 import secrets
+import string
 import urllib.error
 import urllib.request
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Protocol
-from urllib.parse import urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 
 from prism._http_deadline import NetworkDeadline, opener
+from prism.errors import ErrorCode, PrismError
 
 __all__ = [
     "HttpRequest",
@@ -160,25 +162,90 @@ def _origin(url: str) -> tuple[str, str, int | None] | None:
     return scheme, parts.hostname, port
 
 
+MAX_PROVIDER_REDIRECTS = 10
+
+# Dropped with the body when a redirect turns a request into a GET.
+_BODY_HEADERS = frozenset(
+    {"content-length", "content-type", "content-encoding", "content-language"}
+)
+
+
 class _SameOriginRedirect(urllib.request.HTTPRedirectHandler):
     """Follow a redirect only while it stays on the request's own origin.
 
     urllib re-sends every header a request was built with to wherever
     ``Location`` points, and the headers of a provider call carry its
     credentials under many names. Rather than strip a list of names, a
-    redirect to another scheme, host or port is not followed at all: the
-    redirect itself is returned as the answer, as with ``follow_redirects``
-    false. Each hop is compared with the one before it, so a chain can never
-    leave the origin it started on.
+    redirect to another scheme, host or port is not followed at all: it is
+    refused with ``redirect_refused`` before anything is sent to it, as in the
+    PHP reference and prism-ts. Each hop is compared with the request's
+    origin, so a chain can never leave it.
+
+    A same-origin 307 or 308 keeps the method and body. A 303, or a 301/302
+    answering a POST, becomes a GET without a body. More than
+    ``MAX_PROVIDER_REDIRECTS`` hops is refused with ``too_many_redirects``.
     """
+
+    def http_error_302(self, req: Any, fp: Any, code: int, msg: str, headers: Any) -> Any:
+        location = headers.get("location") or headers.get("uri")
+        if not location:
+            return None
+        fp.close()  # The redirect's own body is never read.
+        try:
+            newurl = urljoin(req.full_url, location)
+        except ValueError:
+            raise _redirect_refused(code, "a Location that is not a valid URL") from None
+        # As urllib does: a Location may hold characters a request line cannot.
+        newurl = quote(newurl, encoding="iso-8859-1", safe=string.punctuation)
+        new = self.redirect_request(req, fp, code, msg, headers, newurl)
+        return self.parent.open(new, timeout=req.timeout)
+
+    http_error_301 = http_error_303 = http_error_307 = http_error_308 = http_error_302
 
     def redirect_request(
         self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str
     ) -> Any:
-        current = _origin(req.full_url)
-        if current is None or _origin(newurl) != current:
-            return None
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
+        origin = getattr(req, "prism_origin", None) or _origin(req.full_url)
+        if origin is None or _origin(newurl) != origin:
+            raise _redirect_refused(code, "a redirect to a different origin")
+        hops = getattr(req, "prism_redirects", 0)
+        if hops >= MAX_PROVIDER_REDIRECTS:
+            raise PrismError(
+                ErrorCode.TOO_MANY_REDIRECTS,
+                f"The provider redirected more than {MAX_PROVIDER_REDIRECTS} times.",
+            )
+
+        method = req.get_method()
+        data = req.data
+        header_items = dict(req.headers)
+        if (code == 303 and method not in ("GET", "HEAD")) or (
+            code in (301, 302) and method == "POST"
+        ):
+            method, data = "GET", None
+            header_items = {
+                name: value
+                for name, value in header_items.items()
+                if name.lower() not in _BODY_HEADERS
+            }
+
+        new = urllib.request.Request(
+            newurl,
+            data=data,
+            headers=header_items,
+            origin_req_host=req.origin_req_host,
+            unverifiable=True,
+            method=method,
+        )
+        new.prism_origin = origin  # type: ignore[attr-defined]
+        new.prism_redirects = hops + 1  # type: ignore[attr-defined]
+        return new
+
+
+def _redirect_refused(code: int, what: str) -> PrismError:
+    return PrismError(
+        ErrorCode.REDIRECT_REFUSED,
+        f"The provider answered {code} with {what}; it was not followed.",
+    )
 
 
 def _redirect_handler(request: HttpRequest) -> urllib.request.HTTPRedirectHandler:
