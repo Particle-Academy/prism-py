@@ -208,6 +208,10 @@ class _SameOriginRedirect(urllib.request.HTTPRedirectHandler):
         origin = getattr(req, "prism_origin", None) or _origin(req.full_url)
         if origin is None or _origin(newurl) != origin:
             raise _redirect_refused(code, "a redirect to a different origin")
+        # A user name or password in Location is the server choosing where, and
+        # as whom, to connect; urllib would read it as part of the host name.
+        if "@" in urlsplit(newurl).netloc:
+            raise _redirect_refused(code, "a Location that carries credentials")
         hops = getattr(req, "prism_redirects", 0)
         if hops >= MAX_PROVIDER_REDIRECTS:
             raise PrismError(
