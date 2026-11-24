@@ -10,6 +10,8 @@ BREAKING CHANGE: A per-call provider `url` -- `using(provider, model, {"url": ..
 - The default transports follow an HTTP redirect only while it stays on the request's own scheme, host and port. A redirect anywhere else is returned as the response instead of being followed, so request headers are never re-sent to another origin. Every built-in provider reports it as `provider_response_error`. Same-origin redirects are still followed.
 - On chat completions, a user message carrying a document, audio or video part is refused with `unsupported_media`. The reference drops these parts without saying so.
 - A stream that ends without a finish reason reports `unknown`, not `stop`.
+- `ToolCall.to_dict()` no longer keeps the text of unusable arguments. Such a call is stored as `"arguments": "]"` with `"arguments_malformed": true`, as the PHP reference stores it, and `from_dict()` reads that record (or any record marked `arguments_malformed`) back as a call with unusable arguments. Records of usable calls are unchanged. This applies to every record holding a call: messages, steps and responses.
+- Whether a tool call's arguments are usable no longer depends on how deep the caller's stack is. Valid arguments nested 500 levels deep were refused when the call was classified from a deep stack, because decoding and encoding them ran out of recursion room.
 
 ## 0.11.0 — 2026-11-23
 
