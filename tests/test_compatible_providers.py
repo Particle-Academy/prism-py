@@ -191,7 +191,8 @@ def test_an_entry_at_the_openai_url_still_does_not_inherit_the_openai_key(
     [sent] = wire.sent
     assert sent.url == "https://env-openai.test/v1/chat/completions"
     assert sent.header("Authorization") is None
-    assert_no_environment_value(sent)
+    for name in ("OPENAI_API_KEY", "OPENAI_ORGANIZATION", "OPENAI_PROJECT"):
+        assert ENV[name] not in sent.wire
 
 
 def test_a_broken_openai_environment_does_not_reach_a_compatible_provider(
@@ -309,9 +310,9 @@ def test_a_built_in_name_is_refused(wire: Recorder, name: str, replace: bool) ->
         "my-vllm ",
         "my vllm",
         "my-vllm\n",
-        "my-vllm​",
-        "оpenai",  # Cyrillic o
-        "ｏｐｅｎａｉ",  # full-width openai
+        "my-vllm\u200b",
+        "\u043epenai",  # Cyrillic o
+        "\uff4f\uff50\uff45\uff4e\uff41\uff49",  # full-width openai
         "",
         "-vllm",
         "a" * 65,
@@ -393,7 +394,7 @@ def test_a_missing_driver_is_refused() -> None:
         " https://vllm.test/v1",
         "https://vllm.test/v1 ",
         "https://vllm.test/\nv1",
-        "https://vllm.test/v1​",
+        "https://vllm.test/v1\u200b",
         "https://[::1/v1",
         42,
     ],
@@ -444,6 +445,29 @@ def test_a_credential_that_is_not_text_is_refused_without_echoing_it(field: str)
         configure_providers({"my-vllm": entry(**{field: 12345678})})
 
     assert "12345678" not in str(raised.value)
+
+
+@pytest.mark.parametrize("value", ["sk-test-vllm\n", "sk-test vllm", "sk-test-vllm\u200b"])
+@pytest.mark.parametrize("field", ["api_key", "organization", "project"])
+def test_a_credential_with_whitespace_or_controls_is_refused_without_echoing_it(
+    field: str, value: str
+) -> None:
+    # As a header value it would be refused by the HTTP stack, whose message
+    # quotes the value: the key, in a log.
+    with pytest.raises(ValueError, match="without whitespace or control characters") as raised:
+        configure_providers({"my-vllm": entry(**{field: value})})
+
+    assert "sk-test" not in str(raised.value)
+
+
+def test_a_per_call_credential_is_held_to_the_same_rule(wire: Recorder) -> None:
+    configure_providers({"my-vllm": entry()})
+
+    with pytest.raises(ValueError, match="without whitespace or control characters") as raised:
+        ask("my-vllm", {"api_key": "sk-test-per-call\r\nX-Injected: 1"})
+
+    assert "sk-test" not in str(raised.value)
+    assert wire.sent == []
 
 
 def test_an_unknown_entry_field_is_refused() -> None:

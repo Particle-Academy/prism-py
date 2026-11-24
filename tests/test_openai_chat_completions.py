@@ -25,6 +25,7 @@ import pytest
 import prism.registry
 from prism import (
     AssistantMessage,
+    Document,
     HttpRequest,
     HttpResponse,
     Image,
@@ -603,9 +604,7 @@ def test_a_streamed_tool_call_is_assembled_and_never_run(wire: Wire) -> None:
 @pytest.mark.parametrize(
     "fragments", [['{"path":', ' "a.txt"'], ["[1,", "2]"], ["42"]], ids=["cut", "list", "number"]
 )
-def test_garbled_streamed_arguments_are_refused_when_read(
-    wire: Wire, fragments: list[str]
-) -> None:
+def test_garbled_streamed_arguments_are_refused_when_read(wire: Wire, fragments: list[str]) -> None:
     first, *rest = fragments
     wire.stream_frames = frames(
         chunk(
@@ -750,3 +749,25 @@ def test_a_system_message_inside_the_conversation_is_kept_in_place(wire: Wire) -
 
     sent = json.loads(wire.body())
     assert [message["role"] for message in sent["messages"]] == ["user", "system", "user"]
+
+
+def test_a_document_part_is_refused_rather_than_dropped(wire: Wire) -> None:
+    # The reference's chat map drops it silently, which answers a question
+    # about an attachment as if there were none.
+    message = UserMessage("Summarise this.", [Document.from_url("https://example.test/a.pdf")])
+
+    with pytest.raises(PrismError) as raised:
+        Prism.text().using("my-vllm", "m").with_messages([message]).as_text()
+
+    assert raised.value.code == "unsupported_media"
+    assert wire.requests == []
+
+
+def test_a_stream_cut_off_before_a_finish_reason_does_not_claim_stop(wire: Wire) -> None:
+    wire.stream_frames = frames(chunk({"content": "Hel"}), done=False)
+
+    events = list(Prism.text().using("my-vllm", "m").with_prompt("x").as_stream())
+
+    end = events[-1]
+    assert isinstance(end, StreamEndEvent)
+    assert end.finish_reason is FinishReason.UNKNOWN

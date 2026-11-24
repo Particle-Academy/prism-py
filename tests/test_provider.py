@@ -170,9 +170,11 @@ def test_a_non_json_body_is_refused_with_a_code() -> None:
     assert raised.value.code == "provider_response_error"
 
 
-def test_the_chat_completions_format_is_refused_with_a_code() -> None:
+def test_an_unknown_api_format_is_refused_with_a_code() -> None:
+    # chat_completions is implemented (G-321); a format nothing implements is
+    # still refused, before any request.
     with pytest.raises(PrismError) as raised:
-        OpenAI(api_key="sk-test", api_format="chat_completions").text(
+        OpenAI(api_key="sk-test", api_format="completions").text(
             Prism.text().using("openai", "gpt-4o").with_prompt("hi").to_request()
         )
 

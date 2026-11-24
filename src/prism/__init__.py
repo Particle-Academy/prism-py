@@ -67,7 +67,7 @@ from prism.providers.base import Provider
 from prism.providers.mistral import Mistral, MistralStreamMapper
 from prism.providers.openai import OpenAI, build_request_body, build_tools, parse_text_response
 from prism.public_url import DnsHostResolver, HostResolver
-from prism.registry import register_provider, resolve_provider
+from prism.registry import configure_providers, register_provider, resolve_provider
 from prism.schema import BooleanSchema, NumberSchema, Schema, StringSchema
 from prism.text import PendingRequest, Request, Response, ResponseBuilder, Step
 from prism.tool import Tool
@@ -178,6 +178,7 @@ __all__ = [
     "build_tools",
     "canonical",
     "canonical_encode",
+    "configure_providers",
     "encode_multipart",
     "message_from_dict",
     "parse_text_response",
