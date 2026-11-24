@@ -399,7 +399,7 @@ HELPER_PRIVATE = {
     "instance-data": "http://instance-data/v1",
     "unspecified IPv6": "http://[::]/v1",
     "6to4 of loopback": "http://[2002:7f00:1::]/v1",
-    "an undecodable name": "http://" + chr(0x00DF) * 70 + ".example/v1",
+    "an undecodable name": "http://" + chr(0x00FC) * 70 + ".example/v1",
 }
 
 HELPER_SCHEME = {
@@ -484,3 +484,140 @@ def test_the_helper_does_not_resolve_names_known_limit() -> None:
 
     # A public name that points at loopback is accepted: no DNS is consulted.
     assert_per_call_url("http://127.0.0.1.nip.io/v1")
+
+
+HOSTS_FILE_AND_EMBEDDED = [
+    "http://localhost4/",  # RHEL, CentOS, Fedora, Amazon Linux
+    "http://localhost4.localdomain4/",
+    "http://LOCALHOST6./",
+    "http://localhost6.localdomain6/",
+    "http://ipv6-localhost/",  # openSUSE
+    "http://ipv6-loopback/",
+    "http://ipv6-localnet/",
+    "http://ipv6-allhosts/",
+    "http://ip6-localnet/",  # Debian, Ubuntu, Docker
+    "http://ip6-mcastprefix/",
+    "http://ip6-allnodes/",
+    "http://ip6-allrouters/",
+    "http://broadcasthost/",  # macOS
+    "http://box.localhost.localdomain/",  # nss-myhostname
+    "http://[::ffff:0:127.0.0.1]/",  # SIIT IPv4-translated
+    "http://[::ffff:0:7f00:1]/",
+    "http://[::ffff:0:a9fe:a9fe]/",
+    "http://[::ffff:0:8.8.8.8]/",  # the whole translated range is refused
+    "http://[2001:4860::5efe:7f00:1]/",  # ISATAP behind a public prefix
+    "http://[2001:4860::200:5efe:a9fe:a9fe]/",
+    "http://[2001:4860::5efe:10.0.0.5]/",
+]
+
+
+@pytest.mark.parametrize("url", HOSTS_FILE_AND_EMBEDDED)
+def test_the_helper_refuses_hosts_file_names_and_ipv4_carrying_ipv6(url: str) -> None:
+    from prism.per_call_url import assert_per_call_url
+
+    with pytest.raises(PrismError) as caught:
+        assert_per_call_url(url)
+    assert caught.value.code == "private_address_refused"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://[2001:4860::5efe:808:808]/v1",
+        "https://localhost4.example/v1",
+        "https://xlocalhost6/v1",
+    ],
+)
+def test_the_helper_allows_names_and_isatap_forms_that_are_public(url: str) -> None:
+    from prism.per_call_url import assert_per_call_url
+
+    assert_per_call_url(url)
+
+
+# The guard on its own refuses a format, invisible or UTS46 deviation character
+# anywhere in the authority; no other check is relied on.
+INVISIBLE = {
+    "joiner inside localhost": "http://loca\u200dlhost/",
+    "non-joiner inside localhost": "http://loca\u200clhost/",
+    "joiner after localhost": "http://localhost\u200d/",
+    "joiner before localhost": "http://\u200dlocalhost/",
+    "joiner after loopback": "http://127.0.0.1\u200d/",
+    "joiner inside loopback": "http://127.0.0.\u200d1/",
+    "non-joiner after loopback": "http://127.0.0.1\u200c/",
+    "joiner after metadata ip": "http://169.254.169.254\u200d/",
+    "joiner after private ip": "http://10.0.0.5\u200d/",
+    "joiner after metadata name": "http://metadata.google.internal\u200d/",
+    "joiner in a public name": "https://gate\u200dway.example/v1",
+    "soft hyphen": "http://loca\u00adlhost/",
+    "word joiner": "http://localhost\u2060/",
+    "mongolian todo soft hyphen": "http://loca\u1806lhost/",
+    "mongolian vowel separator": "http://localhost\u180e/",
+    "variation selector": "http://localhost\ufe0f/",
+    "byte order mark": "http://127.0.0.1\ufeff/",
+    "left-to-right mark": "http://localhost\u200e/",
+    "hangul filler": "http://localhost\u3164/",
+    "tag character": "http://localhost\U000e0001/",
+    "no-break space": "http://localhost\u00a0/",
+    "sharp s (deviation)": "https://fa\u00df.example/v1",
+    "final sigma (deviation)": "https://\u03bb\u03bf\u03b3\u03bf\u03c2.example/v1",
+    "joiner in userinfo": "http://user\u200d@gateway.example/v1",
+}
+
+
+@pytest.mark.parametrize("url", list(INVISIBLE.values()), ids=list(INVISIBLE))
+def test_the_helper_refuses_an_invisible_or_deviation_character(url: str) -> None:
+    from prism.per_call_url import assert_per_call_url
+
+    with pytest.raises(PrismError) as caught:
+        assert_per_call_url(url)
+    assert caught.value.code == "private_address_refused"
+    assert str(caught.value) == HOST_MESSAGE
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://localhost4:8080/v1",
+        "http://localhost4.localdomain4/v1",
+        "http://localhost6:8080/v1",
+        "http://LOCALHOST6.LOCALDOMAIN6./v1",
+        "http://ipv6-localhost/v1",
+        "http://broadcasthost/v1",
+        "http://box.localhost.localdomain/v1",
+        "http://[::ffff:0:127.0.0.1]/v1",
+        "http://[::ffff:0:a9fe:a9fe]/v1",
+        "http://[2001:4860::5efe:7f00:1]/v1",
+    ],
+)
+def test_a_per_call_hosts_file_name_or_ipv4_carrying_ipv6_is_refused(
+    url: str, sent: list[str]
+) -> None:
+    error = attempt("openai", {"url": url, "api_key": "sk-test"})
+    assert_refused(error, sent, "private_address_refused", PRIVATE_MESSAGE)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://loca\u00adlhost/v1",
+        "http://169.254.169.254\u2060/latest",
+        "http://loca\u1806lhost/v1",
+        "http://localhost\ufe0f/v1",
+        "https://fa\u00df.example/v1",
+        "https://\u03bb\u03bf\u03b3\u03bf\u03c2.example/v1",
+    ],
+)
+def test_a_per_call_invisible_or_deviation_character_is_refused(url: str, sent: list[str]) -> None:
+    error = attempt("openai", {"url": url, "api_key": "sk-test"})
+    assert_refused(error, sent, "private_address_refused", HOST_MESSAGE)
+
+
+@pytest.mark.parametrize(
+    "url", ["http://loca\u200dlhost/v1", "http://127.0.0.1\u200d/v1", "http://127.0.0.1\u200c/v1"]
+)
+def test_a_per_call_zero_width_joiner_is_refused_before_any_request(
+    url: str, sent: list[str]
+) -> None:
+    error = attempt("openai", {"url": url, "api_key": "sk-test"})
+    assert error is not None
+    assert sent == []
