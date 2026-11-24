@@ -621,15 +621,15 @@ PUNYCODE_MESSAGE = (
 # which every client sends unchanged. The unicode spelling is refused with its
 # own code, in all three languages, whatever the name.
 NON_ASCII = {
-    "international name": "https://bücher.example/v1",
-    "cyrillic name": "https://пример.рф/v1",
-    "arabic label beside a digit-led label": "https://مثال.3com.example/v1",
-    "hyphens in positions 3 and 4": "https://bücher.ab--cd.example/v1",
-    "full-width loopback": "http://１２７.０.０.１/v1",
-    "full-width digits": "http://１２７.0.0.1/v1",
-    "ideographic full stop": "http://localhost。/v1",
-    "full-width percent sign": "http://loc％61lhost/",
-    "an undecodable name": "http://" + "ü" * 70 + ".example/v1",
+    "international name": "https://b\u00fccher.example/v1",
+    "cyrillic name": "https://\u043f\u0440\u0438\u043c\u0435\u0440.\u0440\u0444/v1",
+    "arabic label beside a digit-led label": "https://\u0645\u062b\u0627\u0644.3com.example/v1",
+    "hyphens in positions 3 and 4": "https://b\u00fccher.ab--cd.example/v1",
+    "full-width loopback": "http://\uff11\uff12\uff17.\uff10.\uff10.\uff11/v1",
+    "full-width digits": "http://\uff11\uff12\uff17.0.0.1/v1",
+    "ideographic full stop": "http://localhost\u3002/v1",
+    "full-width percent sign": "http://loc\uff0561lhost/",
+    "an undecodable name": "http://" + "\u00fc" * 70 + ".example/v1",
 }
 
 
@@ -656,7 +656,7 @@ def test_a_per_call_non_ascii_host_is_refused_before_any_request(url: str, sent:
         "https://xn--strae-oqa.de/v1",
         "https://xn--mgbh0fb.3com.example/v1",
         "https://xn--bcher-kva.ab--cd.example/v1",
-        "https://bü@gateway.example/v1",
+        "https://b\u00fc@gateway.example/v1",
     ],
 )
 def test_the_helper_allows_punycode_and_non_ascii_userinfo(url: str) -> None:
@@ -666,7 +666,8 @@ def test_the_helper_allows_punycode_and_non_ascii_userinfo(url: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "url", ["http://locaẞlhost/v1", "http://127.0.0.1ẞ/v1", "https://gatewayẞ.example/v1"]
+    "url",
+    ["http://loca\u1e9elhost/v1", "http://127.0.0.1\u1e9e/v1", "https://gateway\u1e9e.example/v1"],
 )
 def test_a_per_call_capital_sharp_s_is_refused(url: str, sent: list[str]) -> None:
     error = attempt("openai", {"url": url, "api_key": "sk-test"})
