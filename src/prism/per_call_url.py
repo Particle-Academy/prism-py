@@ -21,6 +21,14 @@ letters, digits, ``-`` and ``.`` (and, inside brackets, an IPv6 literal's
 authority, which URL parsers split in different places. Trailing dots are
 removed before the address step, because a resolver reads ``localhost.`` as
 ``localhost``.
+
+The host must be ASCII. IDNA converters disagree on which name some characters
+spell (deviation characters, joiners, characters that map to one), so no
+conversion is trusted: an international name is given in its punycode
+(``xn--``) form, which every client sends unchanged, and a non-ASCII host is
+refused with ``non_ascii_host_use_punycode``. A format, invisible or deviation
+character anywhere in the authority is refused first, as
+``private_address_refused``.
 """
 
 from __future__ import annotations
@@ -43,10 +51,15 @@ HOST_MESSAGE = (
     "A per-call provider url host may hold only letters, digits, hyphens and dots,"
     " or an IPv6 address in brackets."
 )
+PUNYCODE_MESSAGE = (
+    "A per-call provider url host must be ASCII. Give an international name in its"
+    " punycode (xn--) form."
+)
 
-# As written: a name (non-ASCII is left to IDNA), or a bracketed IPv6 literal.
+# As written: a name (non-ASCII is refused after the invisible check), or a
+# bracketed IPv6 literal.
 _WRITTEN_HOST = re.compile(r"(?:[A-Za-z0-9.\-\u0080-\U0010ffff]+|\[[A-Za-z0-9.:\-]+\])\Z")
-# After IDNA, lowercasing and trailing dots: ASCII only.
+# After lowercasing and trailing dots: ASCII only.
 _CANONICAL_HOST = re.compile(r"[a-z0-9.:\-]+\Z", re.ASCII)
 
 # re.ASCII: under Unicode IGNORECASE, U+017F (long s) would match "s".
@@ -97,14 +110,14 @@ _NAMES = frozenset(
 # is nss-myhostname's).
 _SUFFIXES = (".localhost", ".localhost.localdomain")
 
-# Refused anywhere in the authority, before IDNA: every format or invisible
-# character (Unicode's default-ignorable code points, the Cf format controls,
-# the C1 controls and the non-ASCII spaces) and the four UTS46 deviation
-# characters (U+00DF, U+03C2, U+200C, U+200D). IDNA implementations disagree on
-# these: an HTTP client that deletes a zero-width joiner contacts ``localhost``
-# where a nontransitional conversion reads a public name. Spelled code point for
-# code point in the reference (``PerCallUrl::INVISIBLE``) and prism-ts
-# (``INVISIBLE``). Inclusive ranges.
+# Refused anywhere in the authority, userinfo included: every format or
+# invisible character (Unicode's default-ignorable code points, the Cf format
+# controls, the C1 controls and the non-ASCII spaces), the four UTS46 deviation
+# characters (U+00DF, U+03C2, U+200C, U+200D) and U+1E9E, which UTS46 maps to
+# U+00DF. IDNA implementations disagree on these: an HTTP client that deletes a
+# zero-width joiner contacts ``localhost`` where a nontransitional conversion
+# reads a public name. Spelled code point for code point in the reference
+# (``PerCallUrl::INVISIBLE``) and prism-ts (``INVISIBLE``). Inclusive ranges.
 _INVISIBLE_RANGES = (
     (0x0080, 0x00A0),
     (0x00AD, 0x00AD),
@@ -122,6 +135,7 @@ _INVISIBLE_RANGES = (
     (0x17B4, 0x17B5),
     (0x1806, 0x1806),
     (0x180B, 0x180F),
+    (0x1E9E, 0x1E9E),
     (0x2000, 0x200F),
     (0x2028, 0x202F),
     (0x205F, 0x206F),
@@ -191,7 +205,8 @@ def assert_per_call_url(url: str) -> None:
     :raises PrismError: ``scheme_not_allowed`` for a url that is not absolute
         http/https with a host; ``private_address_refused`` for a loopback,
         private, link-local, metadata or otherwise non-public address, a local
-        name, or a host that reads as an address but cannot be decoded.
+        name, or a host that reads as an address but cannot be decoded;
+        ``non_ascii_host_use_punycode`` for a host that is not ASCII.
     """
     # 1. Scheme.
     if not _HTTP.match(url):
@@ -205,6 +220,8 @@ def assert_per_call_url(url: str) -> None:
         raise _host()
     if _INVISIBLE.search(_authority(url)):
         raise _host()
+    if not written.isascii():
+        raise PrismError(ErrorCode.NON_ASCII_HOST_USE_PUNYCODE, PUNYCODE_MESSAGE)
 
     # 3. Parse. The parser's host drops any userinfo.
     try:
@@ -220,15 +237,10 @@ def assert_per_call_url(url: str) -> None:
     # 4. Normalize.
     if host.startswith("[") and host.endswith("]"):
         host = host[1:-1]
-    if not host.isascii():
-        try:
-            host = host.encode("idna").decode("ascii")
-        except UnicodeError:
-            raise _private() from None
     host = host.translate(_ASCII_LOWER).rstrip(".")
     if not host:
         raise _scheme()
-    # Again after IDNA, which can map a non-ASCII character to `%` or `/`.
+    # The written host was ASCII, so anything else here is a parser surprise.
     if not _CANONICAL_HOST.match(host):
         raise _host()
 

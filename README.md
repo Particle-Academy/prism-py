@@ -249,7 +249,8 @@ address: before the provider is built, a per-call `url` is refused with
 `PrismError` code `private_address_refused` when its host is a loopback,
 private (RFC 1918), link-local, CGNAT, unspecified, documentation, multicast or
 reserved address, an IPv4-mapped, NAT64, 6to4 or ISATAP IPv6 address embedding
-one of those, an IPv4-translated address (`::ffff:0:0:0/96`), `localhost` or
+one of those (a dotted IPv4 tail such as `[2606:4700::8.8.8.8]` is judged like
+its hex spelling), an IPv4-translated address (`::ffff:0:0:0/96`), `localhost` or
 any `*.localhost` or `*.localhost.localdomain`, a loopback or local name from
 the stock hosts files (`localhost.localdomain`, `localhost4`, `localhost6` and
 their `.localdomainN` forms, `ip6-localhost`, `ip6-loopback`,
@@ -261,9 +262,17 @@ refused like `localhost`. The host is also refused, with the same code, when as
 written it holds anything other than letters, digits, `-` and `.` (or an IPv6
 address in brackets): a percent escape is refused, not decoded, and so is a
 backslash before the path. Invisible and formatting characters (zero-width
-joiners, soft hyphens and the like) and `ß` and `ς`, which IDNA converters
-handle differently, are refused anywhere before the path. A url that is not absolute `http`/`https` is refused
-with `scheme_not_allowed`. No message names the url, host or address.
+joiners, soft hyphens and the like) and `ß`, `ẞ` and `ς`, which IDNA converters
+handle differently, are refused anywhere before the path. A url that is not
+absolute `http`/`https` is refused with `scheme_not_allowed`. No message names
+the url, host or address.
+
+**A per-call host must be ASCII. Give an international name in its punycode
+form**: `https://xn--bcher-kva.example/v1`, not `https://bücher.example/v1`.
+IDNA converters do not agree on which name some characters spell, so the check
+does not convert one. Any other non-ASCII per-call host is refused with
+`non_ascii_host_use_punycode`, before any request. The punycode form is sent
+unchanged and checked like any other name.
 
 **The check does not resolve DNS.** A public hostname that resolves to a private
 address (a wildcard-DNS name such as `127.0.0.1.nip.io`, for example) is not
