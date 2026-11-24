@@ -213,17 +213,21 @@ def test_an_empty_written_host_is_a_scheme_error(sent: list[str]) -> None:
 
 
 @pytest.mark.parametrize(
-    ("url", "prefix"),
+    "url",
     [
-        ("https://gateway.example./v1", "https://gateway.example./v1"),
-        ("https://bücher.example/v1", "https://b"),
+        "https://gateway.example./v1",
+        "https://xn--bcher-kva.example/v1",
+        "https://xn--strae-oqa.de/v1",
+        "https://xn--mgbn2ecje63gr19l.ir/v1",
+        "https://xn--mgbh0fb.3com.example/v1",
+        "https://xn--bcher-kva.ab--cd.example/v1",
     ],
 )
-def test_a_public_host_with_a_trailing_dot_or_international_name_dispatches(
-    url: str, prefix: str, sent: list[str]
+def test_a_public_host_with_a_trailing_dot_or_international_name_in_punycode_dispatches(
+    url: str, sent: list[str]
 ) -> None:
     attempt("openai", {"url": url, "api_key": "sk-test"})
-    assert_dispatched(sent, prefix)
+    assert_dispatched(sent, url)
 
 
 def test_a_per_call_public_url_dispatches(sent: list[str]) -> None:
@@ -389,8 +393,6 @@ HELPER_PRIVATE = {
     "over 32 bits": "http://4294967296/v1",
     "a very long label": "http://" + "9" * 400 + "/v1",
     "numeric last label after a name": "http://example.123/v1",
-    "full-width digits": "http://" + chr(0xFF11) + chr(0xFF12) + chr(0xFF17) + ".0.0.1/v1",
-    "ideographic full stop": "http://localhost" + chr(0x3002) + "/v1",
     "subdomain of localhost": "http://api.localhost/v1",
     "localhost.localdomain": "http://localhost.localdomain/v1",
     "ip6-localhost": "http://ip6-localhost/v1",
@@ -399,7 +401,6 @@ HELPER_PRIVATE = {
     "instance-data": "http://instance-data/v1",
     "unspecified IPv6": "http://[::]/v1",
     "6to4 of loopback": "http://[2002:7f00:1::]/v1",
-    "an undecodable name": "http://" + chr(0x00FC) * 70 + ".example/v1",
 }
 
 HELPER_SCHEME = {
@@ -462,21 +463,6 @@ def test_the_built_in_defaults_the_exemption_uses_are_the_providers_own() -> Non
         ("mistral", MISTRAL),
     ):
         assert prism.registry._built_in_policy(key).configured_url() == default
-
-
-@pytest.mark.parametrize(
-    "url",
-    [
-        "http://loc\uff0561lhost/",
-        "http://\uff4c\uff4f\uff43\uff05\uff16\uff11\uff4c\uff48\uff4f\uff53\uff54/",
-    ],
-)
-def test_the_helper_refuses_a_host_that_idna_maps_to_an_escape(url: str) -> None:
-    from prism.per_call_url import assert_per_call_url
-
-    with pytest.raises(PrismError) as caught:
-        assert_per_call_url(url)
-    assert caught.value.code == "private_address_refused"
 
 
 def test_the_helper_does_not_resolve_names_known_limit() -> None:
@@ -558,6 +544,8 @@ INVISIBLE = {
     "hangul filler": "http://localhost\u3164/",
     "tag character": "http://localhost\U000e0001/",
     "no-break space": "http://localhost\u00a0/",
+    "capital sharp s (maps to a deviation)": "http://loca\u1e9elhost/",
+    "capital sharp s after loopback": "http://127.0.0.1\u1e9e/",
     "sharp s (deviation)": "https://fa\u00df.example/v1",
     "final sigma (deviation)": "https://\u03bb\u03bf\u03b3\u03bf\u03c2.example/v1",
     "joiner in userinfo": "http://user\u200d@gateway.example/v1",
@@ -621,3 +609,95 @@ def test_a_per_call_zero_width_joiner_is_refused_before_any_request(
     error = attempt("openai", {"url": url, "api_key": "sk-test"})
     assert error is not None
     assert sent == []
+
+
+PUNYCODE_MESSAGE = (
+    "A per-call provider url host must be ASCII. Give an international name in its"
+    " punycode (xn--) form."
+)
+
+# A per-call host is ASCII. IDNA converters disagree on which name some
+# characters spell, so an international name is given in its punycode form,
+# which every client sends unchanged. The unicode spelling is refused with its
+# own code, in all three languages, whatever the name.
+NON_ASCII = {
+    "international name": "https://bücher.example/v1",
+    "cyrillic name": "https://пример.рф/v1",
+    "arabic label beside a digit-led label": "https://مثال.3com.example/v1",
+    "hyphens in positions 3 and 4": "https://bücher.ab--cd.example/v1",
+    "full-width loopback": "http://１２７.０.０.１/v1",
+    "full-width digits": "http://１２７.0.0.1/v1",
+    "ideographic full stop": "http://localhost。/v1",
+    "full-width percent sign": "http://loc％61lhost/",
+    "an undecodable name": "http://" + "ü" * 70 + ".example/v1",
+}
+
+
+@pytest.mark.parametrize("url", list(NON_ASCII.values()), ids=list(NON_ASCII))
+def test_the_helper_refuses_a_non_ascii_host_with_its_own_code(url: str) -> None:
+    from prism.per_call_url import assert_per_call_url
+
+    with pytest.raises(PrismError) as caught:
+        assert_per_call_url(url)
+    assert caught.value.code == "non_ascii_host_use_punycode"
+    assert str(caught.value) == PUNYCODE_MESSAGE
+
+
+@pytest.mark.parametrize("url", list(NON_ASCII.values())[:5], ids=list(NON_ASCII)[:5])
+def test_a_per_call_non_ascii_host_is_refused_before_any_request(url: str, sent: list[str]) -> None:
+    error = attempt("openai", {"url": url, "api_key": "sk-test"})
+    assert_refused(error, sent, "non_ascii_host_use_punycode", PUNYCODE_MESSAGE)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://xn--bcher-kva.example/v1",
+        "https://xn--strae-oqa.de/v1",
+        "https://xn--mgbh0fb.3com.example/v1",
+        "https://xn--bcher-kva.ab--cd.example/v1",
+        "https://bü@gateway.example/v1",
+    ],
+)
+def test_the_helper_allows_punycode_and_non_ascii_userinfo(url: str) -> None:
+    from prism.per_call_url import assert_per_call_url
+
+    assert_per_call_url(url)
+
+
+@pytest.mark.parametrize(
+    "url", ["http://locaẞlhost/v1", "http://127.0.0.1ẞ/v1", "https://gatewayẞ.example/v1"]
+)
+def test_a_per_call_capital_sharp_s_is_refused(url: str, sent: list[str]) -> None:
+    error = attempt("openai", {"url": url, "api_key": "sk-test"})
+    assert_refused(error, sent, "private_address_refused", HOST_MESSAGE)
+
+
+# An IPv6 literal may end in a dotted IPv4 address. It is the same address as
+# its hex spelling and is judged the same way: refused when it, or the IPv4
+# address it carries, is private.
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://[2606:4700::8.8.8.8]/v1",
+        "http://[2606:4700::1:8.8.8.8]/v1",
+        "http://[2606:4700::5efe:8.8.8.8]/v1",
+    ],
+)
+def test_a_public_ipv6_literal_with_a_dotted_tail_dispatches(url: str, sent: list[str]) -> None:
+    attempt("openai", {"url": url, "api_key": "sk-test"})
+    assert_dispatched(sent, url)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://[2606:4700::5efe:127.0.0.1]/v1",
+        "http://[64:ff9b::169.254.169.254]/latest",
+        "http://[::ffff:0:10.0.0.5]/v1",
+        "http://[::127.0.0.1]/v1",
+    ],
+)
+def test_an_ipv6_literal_with_a_private_dotted_tail_is_refused(url: str, sent: list[str]) -> None:
+    error = attempt("openai", {"url": url, "api_key": "sk-test"})
+    assert_refused(error, sent, "private_address_refused", PRIVATE_MESSAGE)
