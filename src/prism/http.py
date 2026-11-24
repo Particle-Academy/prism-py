@@ -144,6 +144,47 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+def _origin(url: str) -> tuple[str, str, int | None] | None:
+    """Scheme, host and effective port; ``None`` for a url that has none."""
+    try:
+        parts = urlsplit(url)
+        scheme = parts.scheme.translate(_ASCII_FOLD)
+        port = parts.port if parts.port is not None else _DEFAULT_PORTS.get(scheme)
+    except ValueError:
+        return None
+    if not parts.hostname:
+        return None
+    return scheme, parts.hostname, port
+
+
+class _SameOriginRedirect(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect only while it stays on the request's own origin.
+
+    urllib re-sends every header a request was built with to wherever
+    ``Location`` points, and the headers of a provider call carry its
+    credentials under many names. Rather than strip a list of names, a
+    redirect to another scheme, host or port is not followed at all: the
+    redirect itself is returned as the answer, as with ``follow_redirects``
+    false. Each hop is compared with the one before it, so a chain can never
+    leave the origin it started on.
+    """
+
+    def redirect_request(
+        self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str
+    ) -> Any:
+        current = _origin(req.full_url)
+        if current is None or _origin(newurl) != current:
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _redirect_handler(request: HttpRequest) -> urllib.request.HTTPRedirectHandler:
+    return _SameOriginRedirect() if request.follow_redirects else _NoRedirect()
+
+
 class UrllibTransport:
     """The default transport: :mod:`urllib.request`, no third-party code.
 
@@ -166,7 +207,7 @@ class UrllibTransport:
             request.resolved_addresses,
         )
         try:
-            open_request = opener(budget, [] if request.follow_redirects else [_NoRedirect()]).open
+            open_request = opener(budget, [_redirect_handler(request)]).open
             try:
                 response = open_request(raw, timeout=budget.connection_timeout())
             except urllib.error.HTTPError as error:
@@ -253,7 +294,7 @@ class UrllibStreamTransport:
         response: Any = None
         try:
             try:
-                response = opener(budget, [] if request.follow_redirects else [_NoRedirect()]).open(
+                response = opener(budget, [_redirect_handler(request)]).open(
                     raw, timeout=budget.connection_timeout()
                 )
             except urllib.error.HTTPError as error:
