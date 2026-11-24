@@ -32,7 +32,8 @@ class DnsHostResolver:
 # rather than delegated to a language's IP helpers (G-89): Python's is_global is
 # version-dependent, and PHP's filter_var flags missed CGNAT, where Alibaba
 # Cloud's metadata endpoint lives. As in TypeScript, every IPv4-compatible IPv6
-# spelling is refused consistently.
+# spelling is refused consistently, SIIT IPv4-translated (::ffff:0:0:0/96)
+# included.
 _BLOCKED = tuple(
     ipaddress.ip_network(cidr)
     for cidr in (
@@ -52,6 +53,7 @@ _BLOCKED = tuple(
         "240.0.0.0/4",
         "::/96",
         "::ffff:0:0/96",
+        "::ffff:0:0:0/96",
         "64:ff9b:1::/48",
         "100::/64",
         "2001::/32",
@@ -91,6 +93,15 @@ def is_public_address(address: str) -> bool:
             if parsed in network:
                 embedded = ipaddress.IPv4Address(parsed.packed[offset : offset + 4])
                 return is_public_address(str(embedded))
+        # ISATAP (RFC 5214) puts an IPv4 address in the low 32 bits behind the
+        # interface identifier 0000:5efe (0200:5efe with the u bit, and the g bit
+        # may be set too), under ANY prefix. On an ISATAP site the packet is
+        # tunnelled to that IPv4 address, so it is judged as well; the prefix is
+        # still judged below.
+        packed = parsed.packed
+        if packed[8] & 0xFC == 0 and packed[9:12] == bytes((0x00, 0x5E, 0xFE)):
+            if not is_public_address(str(ipaddress.IPv4Address(packed[12:16]))):
+                return False
     return not any(parsed in network for network in _BLOCKED)
 
 

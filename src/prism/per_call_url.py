@@ -58,16 +58,92 @@ _DECIMAL = re.compile(r"(0|[1-9][0-9]*)\Z", re.ASCII)
 
 _MAX_LABEL = 4294967295
 
+# Names that reach a non-public address without DNS: RFC 6761's ``localhost``,
+# the names the stock hosts files map to loopback or to an IPv6 local or
+# multicast address, and the documented cloud metadata names. Hosts files:
+# Debian, Ubuntu and Docker (``ip6-*``); RHEL, CentOS, Fedora and Amazon Linux
+# (``localhost4``, ``localhost6`` and their ``.localdomainN`` forms); openSUSE
+# (``ipv6-*``); Alpine (``localhost.localdomain``); macOS (``broadcasthost``).
+# Windows ships no active entries.
 _NAMES = frozenset(
     {
         "localhost",
         "localhost.localdomain",
+        "localhost4",
+        "localhost4.localdomain4",
+        "localhost6",
+        "localhost6.localdomain6",
         "ip6-localhost",
         "ip6-loopback",
+        "ip6-localnet",
+        "ip6-mcastprefix",
+        "ip6-allnodes",
+        "ip6-allrouters",
+        "ipv6-localhost",
+        "ipv6-loopback",
+        "ipv6-localnet",
+        "ipv6-mcastprefix",
+        "ipv6-allnodes",
+        "ipv6-allrouters",
+        "ipv6-allhosts",
+        "broadcasthost",
         "metadata",
         "metadata.google.internal",
         "instance-data",
     }
+)
+
+# Every name under these reaches loopback without DNS (``*.localhost.localdomain``
+# is nss-myhostname's).
+_SUFFIXES = (".localhost", ".localhost.localdomain")
+
+# Refused anywhere in the authority, before IDNA: every format or invisible
+# character (Unicode's default-ignorable code points, the Cf format controls,
+# the C1 controls and the non-ASCII spaces) and the four UTS46 deviation
+# characters (U+00DF, U+03C2, U+200C, U+200D). IDNA implementations disagree on
+# these: an HTTP client that deletes a zero-width joiner contacts ``localhost``
+# where a nontransitional conversion reads a public name. Spelled code point for
+# code point in the reference (``PerCallUrl::INVISIBLE``) and prism-ts
+# (``INVISIBLE``). Inclusive ranges.
+_INVISIBLE_RANGES = (
+    (0x0080, 0x00A0),
+    (0x00AD, 0x00AD),
+    (0x00DF, 0x00DF),
+    (0x034F, 0x034F),
+    (0x03C2, 0x03C2),
+    (0x0600, 0x0605),
+    (0x061C, 0x061C),
+    (0x06DD, 0x06DD),
+    (0x070F, 0x070F),
+    (0x0890, 0x0891),
+    (0x08E2, 0x08E2),
+    (0x115F, 0x1160),
+    (0x1680, 0x1680),
+    (0x17B4, 0x17B5),
+    (0x1806, 0x1806),
+    (0x180B, 0x180F),
+    (0x2000, 0x200F),
+    (0x2028, 0x202F),
+    (0x205F, 0x206F),
+    (0x2800, 0x2800),
+    (0x3000, 0x3000),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFFB),
+    (0x110BD, 0x110BD),
+    (0x110CD, 0x110CD),
+    (0x13430, 0x1343F),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0000, 0xE0FFF),
+)
+# Lone surrogates (U+D800..U+DFFF) cannot be read as text, so they are refused too.
+_INVISIBLE = re.compile(
+    "["
+    + "".join(f"{chr(low)}-{chr(high)}" for low, high in (*_INVISIBLE_RANGES, (0xD800, 0xDFFF)))
+    + "]"
 )
 
 _ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
@@ -87,15 +163,19 @@ def _host() -> PrismError:
     return PrismError(ErrorCode.PRIVATE_ADDRESS_REFUSED, HOST_MESSAGE)
 
 
+def _authority(url: str) -> str:
+    """The authority as written: from after ``//`` to the first ``/``, ``?`` or ``#``."""
+    rest = url[url.index("//") + 2 :]
+    return re.split(r"[/?#]", rest, maxsplit=1)[0]
+
+
 def _written_host(url: str) -> str | None:
     """The host exactly as written, or None when the authority holds a backslash.
 
-    The authority runs from after ``//`` to the first ``/``, ``?`` or ``#``;
-    the host follows its last ``@`` and ends at the port's ``:`` (or, when
-    bracketed, at the first ``]``). Nothing is decoded.
+    The host follows the authority's last ``@`` and ends at the port's ``:``
+    (or, when bracketed, at the first ``]``). Nothing is decoded.
     """
-    rest = url[url.index("//") + 2 :]
-    authority = re.split(r"[/?#]", rest, maxsplit=1)[0]
+    authority = _authority(url)
     if "\\" in authority:
         return None
     host_port = authority.rpartition("@")[2]
@@ -122,6 +202,8 @@ def assert_per_call_url(url: str) -> None:
     if written == "":
         raise _scheme()
     if written is None or not _WRITTEN_HOST.match(written):
+        raise _host()
+    if _INVISIBLE.search(_authority(url)):
         raise _host()
 
     # 3. Parse. The parser's host drops any userinfo.
@@ -170,7 +252,7 @@ def assert_per_call_url(url: str) -> None:
         return
 
     # 7. Local and metadata names.
-    if host in _NAMES or host.endswith(".localhost"):
+    if host in _NAMES or host.endswith(_SUFFIXES):
         raise _private()
 
     # 8. Any other name is allowed; what it resolves to is not checked here.
