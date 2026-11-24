@@ -375,3 +375,14 @@ def test_a_relative_redirect_stays_on_the_origin(endpoint: Server) -> None:
 
     assert response.status == 400
     assert [path for _, path, _ in endpoint.seen] == ["/v1/x", "/landed"]
+
+
+@pytest.mark.parametrize("userinfo", ["evil.example@", "user:secret@"])
+def test_a_same_origin_location_with_userinfo_is_refused(endpoint: Server, userinfo: str) -> None:
+    host_port = endpoint.url.split("://", 1)[1]
+    endpoint.redirect = (302, f"http://{userinfo}{host_port}/landed")
+
+    code = _refusal(lambda: UrllibTransport().send(_request(f"{endpoint.url}/v1/x")))
+
+    assert code == "redirect_refused"
+    assert len(endpoint.seen) == 1
