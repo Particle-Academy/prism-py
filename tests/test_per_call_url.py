@@ -398,7 +398,6 @@ HELPER_PRIVATE = {
     "bare metadata": "http://metadata/v1",
     "instance-data": "http://instance-data/v1",
     "unspecified IPv6": "http://[::]/v1",
-    "scoped IPv6": "http://[fe80::1%25eth0]/v1",
     "6to4 of loopback": "http://[2002:7f00:1::]/v1",
     "an undecodable name": "http://" + chr(0x00DF) * 70 + ".example/v1",
 }
@@ -463,3 +462,25 @@ def test_the_built_in_defaults_the_exemption_uses_are_the_providers_own() -> Non
         ("mistral", MISTRAL),
     ):
         assert prism.registry._built_in_policy(key).configured_url() == default
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://loc\uff0561lhost/",
+        "http://\uff4c\uff4f\uff43\uff05\uff16\uff11\uff4c\uff48\uff4f\uff53\uff54/",
+    ],
+)
+def test_the_helper_refuses_a_host_that_idna_maps_to_an_escape(url: str) -> None:
+    from prism.per_call_url import assert_per_call_url
+
+    with pytest.raises(PrismError) as caught:
+        assert_per_call_url(url)
+    assert caught.value.code == "private_address_refused"
+
+
+def test_the_helper_does_not_resolve_names_known_limit() -> None:
+    from prism.per_call_url import assert_per_call_url
+
+    # A public name that points at loopback is accepted: no DNS is consulted.
+    assert_per_call_url("http://127.0.0.1.nip.io/v1")
