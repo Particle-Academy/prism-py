@@ -248,16 +248,21 @@ including `127.0.0.1`. A url passed for a single call may not choose a private
 address: before the provider is built, a per-call `url` is refused with
 `PrismError` code `private_address_refused` when its host is a loopback,
 private (RFC 1918), link-local, CGNAT, unspecified, documentation, multicast or
-reserved address, an IPv4-mapped, NAT64 or 6to4 IPv6 address embedding one of
-those, `localhost` or any `*.localhost`, `localhost.localdomain`,
-`ip6-localhost`, `ip6-loopback`, `metadata`, `metadata.google.internal` or
-`instance-data`. IPv4 literals are read in the shortened and numeric forms a
+reserved address, an IPv4-mapped, NAT64, 6to4 or ISATAP IPv6 address embedding
+one of those, an IPv4-translated address (`::ffff:0:0:0/96`), `localhost` or
+any `*.localhost` or `*.localhost.localdomain`, a loopback or local name from
+the stock hosts files (`localhost.localdomain`, `localhost4`, `localhost6` and
+their `.localdomainN` forms, `ip6-localhost`, `ip6-loopback`,
+`ipv6-localhost`, `broadcasthost` and similar), `metadata`,
+`metadata.google.internal` or `instance-data`. IPv4 literals are read in the shortened and numeric forms a
 resolver accepts (`2130706433`, `0177.0.0.1`, `0x7f000001`, `127.1`), and one
 that cannot be read is refused. Trailing dots are ignored, so `localhost.` is
 refused like `localhost`. The host is also refused, with the same code, when as
 written it holds anything other than letters, digits, `-` and `.` (or an IPv6
 address in brackets): a percent escape is refused, not decoded, and so is a
-backslash before the path. A url that is not absolute `http`/`https` is refused
+backslash before the path. Invisible and formatting characters (zero-width
+joiners, soft hyphens and the like) and `ß` and `ς`, which IDNA converters
+handle differently, are refused anywhere before the path. A url that is not absolute `http`/`https` is refused
 with `scheme_not_allowed`. No message names the url, host or address.
 
 **The check does not resolve DNS.** A public hostname that resolves to a private
