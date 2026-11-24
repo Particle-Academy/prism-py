@@ -192,7 +192,8 @@ The provider uses only its own entry's credentials. It never reads
 `OPENAI_API_FORMAT`, or takes anything from the `openai` provider. With no key it
 sends no `Authorization` header. If a per-call `url` points at a different
 endpoint, the entry's key, organization and project are dropped unless the call
-passes its own.
+passes its own. Its requests do not follow HTTP redirects, which would carry the
+key to another host; a redirect is reported as an error.
 
 The url must be an absolute `http` or `https` url with a host. Private, loopback
 and link-local addresses are allowed. Every entry is checked before any is

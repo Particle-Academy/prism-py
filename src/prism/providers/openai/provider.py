@@ -6,6 +6,7 @@ import json
 import uuid
 from collections.abc import Iterator
 from contextlib import closing
+from dataclasses import replace
 from typing import Any
 from urllib.parse import quote, urlencode
 
@@ -35,6 +36,8 @@ from prism.files.request import (
 from prism.http import (
     DEFAULT_TIMEOUT,
     HttpRequest,
+    HttpResponse,
+    HttpStreamResponse,
     MultipartBody,
     StreamTransport,
     Transport,
@@ -174,6 +177,11 @@ class OpenAI(Provider):
         whose credentials must be its own entry's and nothing else -- so this
         path does not go through the constructor at all. A missing or empty
         key, organization or project sends no header.
+
+        Redirects are NOT followed. urllib re-sends the Authorization header to
+        wherever a 301, 302 or 303 points, so following one would hand the
+        entry's key to a host nobody configured. A redirect comes back as a
+        response and is reported as an error.
         """
         provider = cls.__new__(cls)
         provider.url = url.rstrip("/")
@@ -182,8 +190,8 @@ class OpenAI(Provider):
         provider.project = project or None
         provider.api_format = api_format
         provider.timeout = timeout
-        provider._transport = transport or UrllibTransport()
-        provider._stream_transport = stream_transport or UrllibStreamTransport()
+        provider._transport = _NoRedirects(transport or UrllibTransport())
+        provider._stream_transport = _NoStreamRedirects(stream_transport or UrllibStreamTransport())
         return provider
 
     def text(self, request: Request) -> Response:
@@ -223,7 +231,8 @@ class OpenAI(Provider):
             )
         )
 
-        if response.status >= 400:
+        # 3xx too: a provider that does not follow redirects sees one as a response.
+        if response.status >= 300:
             # An error response is not an event stream; the message inside it is
             # the only useful thing about this call.
             text = "".join(response.chunks)
@@ -732,6 +741,15 @@ class OpenAI(Provider):
             )
         )
 
+        # 3xx too, and before decoding: a provider that does not follow
+        # redirects sees one as a response, and its body is not an answer.
+        if 300 <= response.status < 400:
+            raise PrismError.provider_response_error(
+                f"OpenAI error [{response.status}]: the endpoint answered with a redirect,"
+                " which is not followed.",
+                status=response.status,
+            )
+
         decoded = self._decode(response.status, response.body)
 
         if response.status >= 400:
@@ -777,6 +795,26 @@ class OpenAI(Provider):
             )
 
         return decoded
+
+
+class _NoRedirects:
+    """Sends every request with ``follow_redirects=False``."""
+
+    def __init__(self, inner: Transport) -> None:
+        self._inner = inner
+
+    def send(self, request: HttpRequest) -> HttpResponse:
+        return self._inner.send(replace(request, follow_redirects=False))
+
+
+class _NoStreamRedirects:
+    """Streams every request with ``follow_redirects=False``."""
+
+    def __init__(self, inner: StreamTransport) -> None:
+        self._inner = inner
+
+    def stream(self, request: HttpRequest) -> HttpStreamResponse:
+        return self._inner.stream(replace(request, follow_redirects=False))
 
 
 def _loads(text: str) -> dict[str, Any]:
