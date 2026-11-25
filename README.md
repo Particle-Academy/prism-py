@@ -241,6 +241,12 @@ A `url`, per call or from `OPENAI_URL` / `ANTHROPIC_URL` / `MISTRAL_URL`, that
 contains whitespace or a control character anywhere, including at either end,
 is refused with `ValueError` before any request is made. It is not trimmed.
 
+A url carrying userinfo (`https://user:secret@gateway.example/v1`), per call or
+configured, is refused by the default transports with `PrismError` code
+`scheme_not_allowed` before any name lookup or connection, because the
+standard-library client cannot send it. Pass credentials in the provider config
+instead. A transport you pass in receives the url as given.
+
 ### Per-call urls
 
 A CONFIG url -- `OPENAI_URL`, `ANTHROPIC_URL`, `MISTRAL_URL`, the provider
