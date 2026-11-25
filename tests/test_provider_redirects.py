@@ -60,6 +60,8 @@ class Server:
     def __init__(self, host: str = "127.0.0.1") -> None:
         self.seen: list[tuple[str, str, dict[str, str]]] = []
         self.redirect: tuple[int, str] | None = None
+        # How many requests get the redirect before the server answers; None is all.
+        self.redirects_left: int | None = None
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -68,7 +70,13 @@ class Server:
                 length = int(self.headers.get("Content-Length") or 0)
                 if length:
                     self.rfile.read(length)
-                if outer.redirect is not None and not self.path.startswith("/landed"):
+                if (
+                    outer.redirect is not None
+                    and not self.path.startswith("/landed")
+                    and (outer.redirects_left is None or outer.redirects_left > 0)
+                ):
+                    if outer.redirects_left is not None:
+                        outer.redirects_left -= 1
                     status, location = outer.redirect
                     self.send_response(status)
                     self.send_header("Location", location)
@@ -327,13 +335,50 @@ def test_a_same_origin_post_redirect_becomes_a_get_without_a_body(
     assert "Content-Length" not in endpoint.seen[1][2]
 
 
-def test_more_than_ten_same_origin_redirects_are_refused(endpoint: Server) -> None:
+def test_more_than_five_same_origin_redirects_are_refused(endpoint: Server) -> None:
+    # The reference follows five redirects and refuses the sixth.
     endpoint.redirect = (307, "/v1/again")
 
     code = _refusal(lambda: UrllibTransport().send(_request(f"{endpoint.url}/v1/x")))
 
     assert code == "too_many_redirects"
-    assert len(endpoint.seen) == 11
+    assert len(endpoint.seen) == 6
+
+
+def test_the_stream_transport_stops_after_five_redirects(endpoint: Server) -> None:
+    endpoint.redirect = (307, "/v1/again")
+
+    code = _refusal(lambda: UrllibStreamTransport().stream(_request(f"{endpoint.url}/v1/x")))
+
+    assert code == "too_many_redirects"
+    assert len(endpoint.seen) == 6
+
+
+def test_a_chain_of_exactly_five_same_origin_redirects_is_followed(endpoint: Server) -> None:
+    endpoint.redirect = (307, "/v1/again")
+    endpoint.redirects_left = 5
+
+    response = UrllibTransport().send(_request(f"{endpoint.url}/v1/x"))
+
+    assert response.status == 400
+    assert len(endpoint.seen) == 6
+
+
+@pytest.mark.parametrize("provider", PROVIDERS)
+def test_a_text_call_stops_after_five_redirects(provider: str, endpoint: Server) -> None:
+    endpoint.redirect = (307, "/v1/again")
+
+    code = _refusal(
+        lambda: (
+            Prism.text()
+            .using(provider, "fixture-model", _config(provider, endpoint))
+            .with_prompt("hi")
+            .as_text()
+        )
+    )
+
+    assert code == "too_many_redirects"
+    assert len(endpoint.seen) == 6
 
 
 @pytest.mark.parametrize("status", [307, 308])
@@ -382,7 +427,9 @@ def test_a_same_origin_location_with_userinfo_is_refused(endpoint: Server, useri
     host_port = endpoint.url.split("://", 1)[1]
     endpoint.redirect = (302, f"http://{userinfo}{host_port}/landed")
 
-    code = _refusal(lambda: UrllibTransport().send(_request(f"{endpoint.url}/v1/x")))
+    with pytest.raises(PrismError) as raised:
+        UrllibTransport().send(_request(f"{endpoint.url}/v1/x"))
 
-    assert code == "redirect_refused"
+    assert raised.value.code == "redirect_refused"
+    assert userinfo.rstrip("@").split(":")[-1] not in str(raised.value)
     assert len(endpoint.seen) == 1

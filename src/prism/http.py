@@ -162,7 +162,9 @@ def _origin(url: str) -> tuple[str, str, int | None] | None:
     return scheme, parts.hostname, port
 
 
-MAX_PROVIDER_REDIRECTS = 10
+# Five, as in the reference: its HTTP client follows five redirects and
+# refuses the sixth.
+MAX_PROVIDER_REDIRECTS = 5
 
 # Dropped with the body when a redirect turns a request into a GET.
 _BODY_HEADERS = frozenset(
