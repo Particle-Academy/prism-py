@@ -11,7 +11,6 @@ from __future__ import annotations
 import codecs
 import ipaddress
 import math
-import re
 import secrets
 import string
 import urllib.error
@@ -259,27 +258,44 @@ USERINFO_MESSAGE = (
     "The url carries userinfo (a user name or password before the host), which the"
     " default transport cannot send; pass credentials in the provider config instead."
 )
+SCHEME_MESSAGE = (
+    "The url is not an absolute http or https url, so the default transport did not send it."
+)
 
-# The authority as urllib reads it: everything between ``//`` and the first
-# ``/``, ``?`` or ``#`` (``urllib.request._splithost``).
-_URLLIB_AUTHORITY = re.compile(r"[^:/?#]*:?//([^/?#]*)", re.DOTALL)
 
+def _urllib_request(request: HttpRequest) -> urllib.request.Request:
+    """The urllib request for ``request``, or a refusal before anything leaves.
 
-def _refuse_unsendable(url: str) -> None:
-    """Refuse a url whose authority urllib would read as part of the host name.
+    Judged on what urllib itself parsed, not on the string: urllib strips a
+    ``<URL:...>`` or ``URL:`` wrapper, and it does not parse userinfo. It reads
+    the whole authority, percent-decoded, as ``host[:port]``, so
+    ``https://user:secret@host/`` would be looked up as the name
+    ``user:secret@host`` and its error would repeat it. So:
 
-    urllib does not parse userinfo. It takes the whole authority, percent-decoded,
-    as ``host[:port]``, so ``https://user:secret@host/`` is looked up as the
-    name ``user:secret@host`` -- the user name and password reach the resolver
-    -- and its error repeats them. Any ``@`` in the authority, written or
-    percent-encoded, is refused with ``scheme_not_allowed`` before anything
-    leaves the process, as prism-ts refuses a url ``fetch`` cannot send. The
-    message names no part of the url. A transport passed in is not held to
-    this: it receives the url as given.
+    - only ``http`` and ``https`` are sent; urllib's opener would also open
+      ``file:``, ``ftp:`` and ``data:`` urls;
+    - any ``@`` in the host urllib read, written or percent-encoded, is refused;
+    - a url urllib cannot parse is refused, without its own error, which
+      quotes the url.
+
+    Each is ``scheme_not_allowed``, as prism-ts refuses a url ``fetch`` cannot
+    send, and no message names any part of the url. A transport passed in is
+    not held to this: it receives the url as given.
     """
-    match = _URLLIB_AUTHORITY.match(url)
-    if match is not None and "@" in unquote(match.group(1)):
+    try:
+        raw = urllib.request.Request(
+            url=request.url,
+            data=request.body,
+            headers=request.headers,
+            method=request.method,
+        )
+    except ValueError:
+        raise PrismError(ErrorCode.SCHEME_NOT_ALLOWED, SCHEME_MESSAGE) from None
+    if raw.type.translate(_ASCII_FOLD) not in ("http", "https") or not raw.host:
+        raise PrismError(ErrorCode.SCHEME_NOT_ALLOWED, SCHEME_MESSAGE)
+    if "@" in raw.host or "@" in unquote(raw.host):
         raise PrismError(ErrorCode.SCHEME_NOT_ALLOWED, USERINFO_MESSAGE)
+    return raw
 
 
 def _redirect_handler(request: HttpRequest) -> urllib.request.HTTPRedirectHandler:
@@ -294,13 +310,7 @@ class UrllibTransport:
     """
 
     def send(self, request: HttpRequest) -> HttpResponse:
-        _refuse_unsendable(request.url)
-        raw = urllib.request.Request(
-            url=request.url,
-            data=request.body,
-            headers=request.headers,
-            method=request.method,
-        )
+        raw = _urllib_request(request)
 
         budget = NetworkDeadline(
             request.timeout,
@@ -380,13 +390,7 @@ class UrllibStreamTransport:
         self.block_size = block_size
 
     def stream(self, request: HttpRequest) -> HttpStreamResponse:
-        _refuse_unsendable(request.url)
-        raw = urllib.request.Request(
-            url=request.url,
-            data=request.body,
-            headers=request.headers,
-            method=request.method,
-        )
+        raw = _urllib_request(request)
 
         budget = NetworkDeadline(
             request.timeout,
