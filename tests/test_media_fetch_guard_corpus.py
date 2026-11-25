@@ -28,8 +28,8 @@ REFUSALS = {
 
 
 def test_inventory_and_explicit_legacy_path_skip() -> None:
-    # 17 rows before corpus 0.1.29, 23 from it (G-366).
-    assert len(ROWS) in (17, 23)
+    # 23 rows from corpus 0.1.29 (G-366). Fewer would silently skip its security rows.
+    assert len(ROWS) >= 23
     assert [row["id"] for row in ROWS] == [f"url-{i:04}" for i in range(1, len(ROWS) + 1)]
     assert SUITE.skipped_ids("py") == ["url-0009"]
     assert SUITE.skipped_ids("php") == []

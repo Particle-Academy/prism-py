@@ -475,3 +475,69 @@ def test_a_guarded_media_fetch_with_userinfo_never_looks_up_the_userinfo(
 
     _assert_userinfo_refused(error, lookups)
     assert lookups == []
+
+
+# urllib strips a "<URL:...>" or "URL:" wrapper before it reads the url, so a
+# check on the raw string alone would miss the userinfo inside one.
+WRAPPED = {
+    "angle-bracket wrapper": "<URL:http://{user}:{password}@{host}/v1>",
+    "URL: prefix": "URL:http://{user}:{password}@{host}/v1",
+    "URL: prefix, user only": "URL:http://{user}@{host}/v1",
+}
+
+
+@pytest.mark.parametrize("url", WRAPPED.values(), ids=WRAPPED.keys())
+def test_a_wrapped_url_with_userinfo_is_refused(
+    url: str, endpoint: Server, lookups: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(
+        "OPENAI_URL", url.format(user=USER, password=PASSWORD, host=endpoint.host_port)
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", KEY)
+
+    error = _attempt(
+        lambda: Prism.text().using("openai", "fixture-model").with_prompt("hi").as_text()
+    )
+
+    _assert_userinfo_refused(error, lookups)
+    assert endpoint.seen == []
+
+
+def test_the_default_transports_send_only_http_and_https(
+    tmp_path: Any, lookups: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The opt-out lets a per-call url name a private address; it must never let
+    # the default transport open a local file or another protocol instead.
+    _opt_in(monkeypatch)
+    (tmp_path / "responses").write_text("LOCAL-FILE-CONTENT", encoding="utf-8")
+    base = "file:///" + tmp_path.as_posix()
+    for url in (base, "ftp://127.0.0.1/v1", "data:text/plain,LOCAL-FILE-CONTENT"):
+        error = _attempt(
+            lambda url=url: (
+                Prism.text()
+                .using("openai", "fixture-model", {"url": url, "api_key": KEY})
+                .with_prompt("hi")
+                .as_text()
+            )
+        )
+        assert isinstance(error, PrismError), url
+        assert error.code == "scheme_not_allowed", url
+        assert "LOCAL-FILE-CONTENT" not in f"{error} {getattr(error, 'body', '')}"
+        assert tmp_path.as_posix() not in str(error)
+    request = HttpRequest("GET", base + "/responses")
+    for call in (UrllibTransport().send, UrllibStreamTransport().stream):
+        error = _attempt(lambda call=call: call(request))
+        assert isinstance(error, PrismError)
+        assert error.code == "scheme_not_allowed"
+    assert lookups == []
+
+
+def test_a_url_urllib_cannot_parse_is_refused_without_echoing_it(lookups: list[str]) -> None:
+    for url in (f"{USER}:{PASSWORD}@gateway.example/v1", f"//{USER}@gateway.example/v1"):
+        error = _attempt(lambda url=url: UrllibTransport().send(HttpRequest("POST", url)))
+        assert isinstance(error, PrismError), url
+        assert error.code == "scheme_not_allowed"
+        assert USER not in str(error) and PASSWORD not in str(error)
+        assert error.__cause__ is None
+        assert error.__context__ is None or error.__suppress_context__
+    assert lookups == []
