@@ -41,7 +41,7 @@ def _ok_body() -> dict[str, Any]:
         "id": "msg_1",
         "type": "message",
         "role": "assistant",
-        "model": "claude-sonnet-4-5",
+        "model": "claude-sonnet-5-5",
         "content": [{"type": "text", "text": "Hello."}],
         "stop_reason": "end_turn",
         "usage": {"input_tokens": 10, "output_tokens": 2},
@@ -60,7 +60,7 @@ def test_posts_to_the_messages_endpoint_and_parses_the_reply() -> None:
 
     response = (
         Prism.text()
-        .using("anthropic", "claude-sonnet-4-5", {"transport": transport, "api_key": "sk-test"})
+        .using("anthropic", "claude-sonnet-5-5", {"transport": transport, "api_key": "sk-test"})
         .with_prompt("Hi")
         .with_max_tokens(64)
         .as_text()
@@ -79,7 +79,7 @@ def test_authenticates_with_x_api_key_and_pins_the_version() -> None:
     transport = RecordingTransport()
 
     Prism.text().using(
-        "anthropic", "claude-sonnet-4-5", {"transport": transport, "api_key": "sk-test"}
+        "anthropic", "claude-sonnet-5-5", {"transport": transport, "api_key": "sk-test"}
     ).with_prompt("Hi").as_text()
 
     assert transport.sent is not None
@@ -93,7 +93,7 @@ def test_always_sends_max_tokens() -> None:
     # is a 400, so a default has to be chosen rather than omitted.
     transport = RecordingTransport()
 
-    Prism.text().using("anthropic", "claude-sonnet-4-5", {"transport": transport}).with_prompt(
+    Prism.text().using("anthropic", "claude-sonnet-5-5", {"transport": transport}).with_prompt(
         "Hi"
     ).as_text()
 
@@ -104,7 +104,7 @@ def test_system_prompts_go_in_the_top_level_field() -> None:
     transport = RecordingTransport()
 
     Prism.text().using(
-        "anthropic", "claude-sonnet-4-5", {"transport": transport}
+        "anthropic", "claude-sonnet-5-5", {"transport": transport}
     ).with_system_prompt("Be brief.").with_prompt("Hi").as_text()
 
     body = _sent_body(transport)
@@ -119,7 +119,7 @@ def test_omits_tools_rather_than_sending_an_empty_list() -> None:
     # models and is rejected outright by others.
     transport = RecordingTransport()
 
-    Prism.text().using("anthropic", "claude-sonnet-4-5", {"transport": transport}).with_prompt(
+    Prism.text().using("anthropic", "claude-sonnet-5-5", {"transport": transport}).with_prompt(
         "Hi"
     ).as_text()
 
@@ -140,7 +140,7 @@ def test_joins_every_text_block_rather_than_taking_the_first() -> None:
 
     response = (
         Prism.text()
-        .using("anthropic", "claude-sonnet-4-5", {"transport": transport})
+        .using("anthropic", "claude-sonnet-5-5", {"transport": transport})
         .with_prompt("Hi")
         .as_text()
     )
@@ -162,7 +162,7 @@ def test_reports_cache_tokens_without_subtracting_them() -> None:
 
     response = (
         Prism.text()
-        .using("anthropic", "claude-sonnet-4-5", {"transport": transport})
+        .using("anthropic", "claude-sonnet-5-5", {"transport": transport})
         .with_prompt("Hi")
         .as_text()
     )
@@ -190,7 +190,7 @@ def test_reports_the_thinking_tokens_anthropic_sends() -> None:
 
     response = (
         Prism.text()
-        .using("anthropic", "claude-sonnet-4-5", {"transport": transport})
+        .using("anthropic", "claude-sonnet-5-5", {"transport": transport})
         .with_prompt("Hi")
         .as_text()
     )
@@ -211,7 +211,7 @@ def test_leaves_thought_tokens_none_when_anthropic_reports_no_thinking() -> None
 
     response = (
         Prism.text()
-        .using("anthropic", "claude-sonnet-4-5", {"transport": transport})
+        .using("anthropic", "claude-sonnet-5-5", {"transport": transport})
         .with_prompt("Hi")
         .as_text()
     )
@@ -226,7 +226,7 @@ def test_raises_on_an_error_body_even_with_a_success_status() -> None:
     )
 
     with pytest.raises(PrismError):
-        Prism.text().using("anthropic", "claude-sonnet-4-5", {"transport": transport}).with_prompt(
+        Prism.text().using("anthropic", "claude-sonnet-5-5", {"transport": transport}).with_prompt(
             "Hi"
         ).as_text()
 
@@ -252,7 +252,7 @@ def test_a_truncated_generation_is_returned_not_raised() -> None:
 
     response = (
         Prism.text()
-        .using("anthropic", "claude-sonnet-4-5", {"transport": transport})
+        .using("anthropic", "claude-sonnet-5-5", {"transport": transport})
         .with_prompt("Hi")
         .as_text()
     )
@@ -272,7 +272,7 @@ def test_an_unrecognised_stop_reason_is_unknown_not_stop() -> None:
 
     response = (
         Prism.text()
-        .using("anthropic", "claude-sonnet-4-5", {"transport": transport})
+        .using("anthropic", "claude-sonnet-5-5", {"transport": transport})
         .with_prompt("Hi")
         .as_text()
     )
@@ -295,7 +295,7 @@ def _body_for(
     transport = RecordingTransport()
     pending = (
         Prism.text()
-        .using("anthropic", "claude-sonnet-4-6", {"transport": transport})
+        .using("anthropic", "claude-sonnet-5-5", {"transport": transport})
         .with_prompt("Hi")
     )
 
@@ -364,7 +364,7 @@ def test_keeps_the_thinking_signature_and_sends_the_block_back_first() -> None:
     def pending() -> Any:
         return (
             Prism.text()
-            .using("anthropic", "claude-sonnet-4-6", {"transport": transport})
+            .using("anthropic", "claude-sonnet-5-5", {"transport": transport})
             .with_provider_options({"thinking": {"type": "adaptive"}})
         )
 
@@ -403,7 +403,7 @@ def test_sends_back_a_thinking_block_whose_text_was_omitted() -> None:
     # Its signature is still required, so an empty text is not "no thinking".
     transport = RecordingTransport()
 
-    Prism.text().using("anthropic", "claude-sonnet-4-6", {"transport": transport}).with_messages(
+    Prism.text().using("anthropic", "claude-sonnet-5-5", {"transport": transport}).with_messages(
         [
             UserMessage("Weather?"),
             AssistantMessage(
@@ -425,7 +425,7 @@ def test_sends_back_a_thinking_block_whose_text_was_omitted() -> None:
 def test_sends_no_thinking_block_without_a_signature() -> None:
     transport = RecordingTransport()
 
-    Prism.text().using("anthropic", "claude-sonnet-4-6", {"transport": transport}).with_messages(
+    Prism.text().using("anthropic", "claude-sonnet-5-5", {"transport": transport}).with_messages(
         [
             UserMessage("Hi"),
             AssistantMessage("Hello.", [], {"thinking": "hmm"}),

@@ -306,7 +306,7 @@ def test_an_anthropic_call_carries_the_quota_it_was_told_about() -> None:
             "id": "msg_1",
             "type": "message",
             "role": "assistant",
-            "model": "claude-sonnet-4-5",
+            "model": "claude-sonnet-5-5",
             "content": [{"type": "text", "text": "Hello."}],
             "stop_reason": "end_turn",
             "usage": {"input_tokens": 10, "output_tokens": 2},
@@ -320,7 +320,7 @@ def test_an_anthropic_call_carries_the_quota_it_was_told_about() -> None:
 
     response = (
         Prism.text()
-        .using("anthropic", "claude-sonnet-4-5", {"transport": transport, "api_key": "sk-test"})
+        .using("anthropic", "claude-sonnet-5-5", {"transport": transport, "api_key": "sk-test"})
         .with_prompt("Hi")
         .with_max_tokens(64)
         .as_text()

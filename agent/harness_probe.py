@@ -130,7 +130,7 @@ def probe_harness() -> dict[str, Any]:
 
         participant = Participant("App\\Models\\User", 7)
         session = app.for_(participant).session("probe")
-        session.using_mode("guarded").using_provider("anthropic").using_model("claude-sonnet-4-5")
+        session.using_mode("guarded").using_provider("anthropic").using_model("claude-sonnet-5-5")
 
         # The same address PHP builds, and the same one prism-harness-ts builds.
         check(

@@ -35,7 +35,7 @@ FIXTURES: dict[str, dict[str, Any]] = {
     },
     "anthropic": {
         "id": "structured",
-        "model": "claude-sonnet-4-5",
+        "model": "claude-sonnet-5-5",
         "stop_reason": "end_turn",
         "content": [{"type": "text", "text": JSON_TEXT}],
         "usage": {"input_tokens": 12, "output_tokens": 7},
@@ -104,7 +104,7 @@ def test_anthropic_native_schema_effort_and_unchanged_messages(mode: bool | None
     options: dict[str, Any] = {"effort": "high"}
     if mode is not None:
         options["use_tool_calling"] = mode
-    pending = structured_pending("anthropic", "claude-sonnet-4-5")
+    pending = structured_pending("anthropic", "claude-sonnet-5-5")
     pending.with_provider_options(options)
     request = pending.to_request()
     before = [message.to_dict() for message in request.messages]
@@ -131,7 +131,7 @@ def test_anthropic_native_schema_effort_and_unchanged_messages(mode: bool | None
 @pytest.mark.parametrize("mode", [True, 1, "enabled", {"mode": "tool"}])
 def test_structured_tool_mode_refused_before_http(mode: Any) -> None:
     transport = Recorder(FIXTURES["anthropic"])
-    pending = structured_pending("anthropic", "claude-sonnet-4-5", transport)
+    pending = structured_pending("anthropic", "claude-sonnet-5-5", transport)
     pending.with_provider_options({"use_tool_calling": mode})
     with pytest.raises(PrismError) as caught:
         pending.as_structured()
@@ -144,7 +144,7 @@ def test_ordinary_anthropic_text_path_unchanged() -> None:
     response = (
         Prism.text()
         .using(
-            "anthropic", "claude-sonnet-4-5", {"api_key": "fixture-only", "transport": transport}
+            "anthropic", "claude-sonnet-5-5", {"api_key": "fixture-only", "transport": transport}
         )
         .with_prompt("Return JSON.")
         .as_text()
@@ -158,7 +158,7 @@ def test_ordinary_anthropic_text_path_unchanged() -> None:
 
 def test_citations_refused_before_http_in_native_mode() -> None:
     transport = Recorder(FIXTURES["anthropic"])
-    pending = structured_pending("anthropic", "claude-sonnet-4-5", transport)
+    pending = structured_pending("anthropic", "claude-sonnet-5-5", transport)
     pending.with_provider_options({"citations": True})
     with pytest.raises(PrismError) as caught:
         pending.as_structured()

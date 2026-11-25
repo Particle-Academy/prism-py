@@ -4,7 +4,7 @@ This loopback MCP server exposes source discovery, test and conformance tools fo
 
 ## Run
 
-Run `python agent/server.py`. The agent uses the source package beside it. The default listener is `127.0.0.1:7412`, configurable with `PRISM_AGENT_PORT`. Provider/model reporting follows the source defaults (Anthropic/claude-sonnet-4-5) and `PRISM_AGENT_PROVIDER`/`PRISM_AGENT_MODEL`.
+Run `python agent/server.py`. The agent uses the source package beside it. The default listener is `127.0.0.1:7412`, configurable with `PRISM_AGENT_PORT`. Provider/model reporting follows the source defaults (Anthropic/claude-sonnet-5-5) and `PRISM_AGENT_PROVIDER`/`PRISM_AGENT_MODEL`.
 
 ## Tools
 
