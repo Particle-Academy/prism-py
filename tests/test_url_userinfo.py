@@ -194,10 +194,12 @@ def test_a_text_call_with_userinfo_in_its_per_call_url_sends_nothing(
     url = f"http://{prefix}{endpoint.host_port}/v1"
 
     error = _attempt(
-        lambda: Prism.text()
-        .using(provider, "fixture-model", {"url": url, "api_key": KEY})
-        .with_prompt("hi")
-        .as_text()
+        lambda: (
+            Prism.text()
+            .using(provider, "fixture-model", {"url": url, "api_key": KEY})
+            .with_prompt("hi")
+            .as_text()
+        )
     )
 
     _assert_userinfo_refused(error, lookups)
@@ -217,10 +219,12 @@ def test_a_stream_with_userinfo_in_its_per_call_url_sends_nothing(
     url = f"http://{prefix}{endpoint.host_port}/v1"
 
     error = _attempt(
-        lambda: Prism.text()
-        .using(provider, "fixture-model", {"url": url, "api_key": KEY})
-        .with_prompt("hi")
-        .as_stream()
+        lambda: (
+            Prism.text()
+            .using(provider, "fixture-model", {"url": url, "api_key": KEY})
+            .with_prompt("hi")
+            .as_stream()
+        )
     )
 
     _assert_userinfo_refused(error, lookups)
@@ -235,10 +239,12 @@ def test_an_embeddings_call_with_userinfo_sends_nothing(
     url = f"http://{USER}:{PASSWORD}@{endpoint.host_port}/v1"
 
     error = _attempt(
-        lambda: Prism.embeddings()
-        .using(provider, "fixture-model", {"url": url, "api_key": KEY})
-        .from_input("hi")
-        .as_embeddings()
+        lambda: (
+            Prism.embeddings()
+            .using(provider, "fixture-model", {"url": url, "api_key": KEY})
+            .from_input("hi")
+            .as_embeddings()
+        )
     )
 
     _assert_userinfo_refused(error, lookups)
@@ -262,10 +268,12 @@ def test_a_per_call_url_with_userinfo_on_a_public_name_is_never_looked_up(
     url: str, lookups: list[str]
 ) -> None:
     error = _attempt(
-        lambda: Prism.text()
-        .using("openai", "fixture-model", {"url": url, "api_key": KEY})
-        .with_prompt("hi")
-        .as_text()
+        lambda: (
+            Prism.text()
+            .using("openai", "fixture-model", {"url": url, "api_key": KEY})
+            .with_prompt("hi")
+            .as_text()
+        )
     )
 
     _assert_userinfo_refused(error, lookups)
@@ -286,10 +294,12 @@ def test_userinfo_confusion_the_per_call_check_refuses_stays_refused(
     url: str, lookups: list[str]
 ) -> None:
     error = _attempt(
-        lambda: Prism.text()
-        .using("openai", "fixture-model", {"url": url, "api_key": KEY})
-        .with_prompt("hi")
-        .as_text()
+        lambda: (
+            Prism.text()
+            .using("openai", "fixture-model", {"url": url, "api_key": KEY})
+            .with_prompt("hi")
+            .as_text()
+        )
     )
 
     assert isinstance(error, PrismError)
@@ -331,10 +341,12 @@ def test_a_url_without_userinfo_is_still_sent(
     _opt_in(monkeypatch)
 
     error = _attempt(
-        lambda: Prism.text()
-        .using("openai", "fixture-model", {"url": f"{endpoint.url}/v1", "api_key": KEY})
-        .with_prompt("hi")
-        .as_text()
+        lambda: (
+            Prism.text()
+            .using("openai", "fixture-model", {"url": f"{endpoint.url}/v1", "api_key": KEY})
+            .with_prompt("hi")
+            .as_text()
+        )
     )
 
     assert isinstance(error, PrismError)
@@ -361,10 +373,14 @@ def test_a_transport_passed_in_receives_the_url_as_given(lookups: list[str]) -> 
             return HttpResponse(status=500, body=b'{"error":{"message":"fixture"}}')
 
     _attempt(
-        lambda: Prism.text()
-        .using("openai", "fixture-model", {"url": url, "api_key": KEY, "transport": Recording()})
-        .with_prompt("hi")
-        .as_text()
+        lambda: (
+            Prism.text()
+            .using(
+                "openai", "fixture-model", {"url": url, "api_key": KEY, "transport": Recording()}
+            )
+            .with_prompt("hi")
+            .as_text()
+        )
     )
 
     assert seen == [f"{url}/responses"]
@@ -408,10 +424,12 @@ def test_a_same_origin_location_with_userinfo_is_refused_on_a_provider_call(
     endpoint.redirect = (status, f"http://{prefix}{endpoint.host_port}/landed")
 
     error = _attempt(
-        lambda: Prism.text()
-        .using("openai", "fixture-model", {"url": f"{endpoint.url}/v1", "api_key": KEY})
-        .with_prompt("hi")
-        .as_text()
+        lambda: (
+            Prism.text()
+            .using("openai", "fixture-model", {"url": f"{endpoint.url}/v1", "api_key": KEY})
+            .with_prompt("hi")
+            .as_text()
+        )
     )
 
     assert isinstance(error, PrismError)

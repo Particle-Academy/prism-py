@@ -11,6 +11,7 @@ from __future__ import annotations
 import codecs
 import ipaddress
 import math
+import re
 import secrets
 import string
 import urllib.error
@@ -19,7 +20,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Protocol
-from urllib.parse import quote, urljoin, urlsplit
+from urllib.parse import quote, unquote, urljoin, urlsplit
 
 from prism._http_deadline import NetworkDeadline, opener
 from prism.errors import ErrorCode, PrismError
@@ -254,6 +255,33 @@ def _redirect_refused(code: int, what: str) -> PrismError:
     )
 
 
+USERINFO_MESSAGE = (
+    "The url carries userinfo (a user name or password before the host), which the"
+    " default transport cannot send; pass credentials in the provider config instead."
+)
+
+# The authority as urllib reads it: everything between ``//`` and the first
+# ``/``, ``?`` or ``#`` (``urllib.request._splithost``).
+_URLLIB_AUTHORITY = re.compile(r"[^:/?#]*:?//([^/?#]*)", re.DOTALL)
+
+
+def _refuse_unsendable(url: str) -> None:
+    """Refuse a url whose authority urllib would read as part of the host name.
+
+    urllib does not parse userinfo. It takes the whole authority, percent-decoded,
+    as ``host[:port]``, so ``https://user:secret@host/`` is looked up as the
+    name ``user:secret@host`` -- the user name and password reach the resolver
+    -- and its error repeats them. Any ``@`` in the authority, written or
+    percent-encoded, is refused with ``scheme_not_allowed`` before anything
+    leaves the process, as prism-ts refuses a url ``fetch`` cannot send. The
+    message names no part of the url. A transport passed in is not held to
+    this: it receives the url as given.
+    """
+    match = _URLLIB_AUTHORITY.match(url)
+    if match is not None and "@" in unquote(match.group(1)):
+        raise PrismError(ErrorCode.SCHEME_NOT_ALLOWED, USERINFO_MESSAGE)
+
+
 def _redirect_handler(request: HttpRequest) -> urllib.request.HTTPRedirectHandler:
     return _SameOriginRedirect() if request.follow_redirects else _NoRedirect()
 
@@ -266,6 +294,7 @@ class UrllibTransport:
     """
 
     def send(self, request: HttpRequest) -> HttpResponse:
+        _refuse_unsendable(request.url)
         raw = urllib.request.Request(
             url=request.url,
             data=request.body,
@@ -351,6 +380,7 @@ class UrllibStreamTransport:
         self.block_size = block_size
 
     def stream(self, request: HttpRequest) -> HttpStreamResponse:
+        _refuse_unsendable(request.url)
         raw = urllib.request.Request(
             url=request.url,
             data=request.body,
