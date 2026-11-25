@@ -54,7 +54,7 @@ def network(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
 @pytest.fixture
 def loopback() -> Iterator[int]:
     class Handler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802 - the stdlib handler name
+        def do_GET(self) -> None:
             body = b"INTERNAL-ONLY-BYTES"
             self.send_response(200)
             self.send_header("Content-Type", "image/png")

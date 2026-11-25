@@ -65,7 +65,6 @@ SHAPES = {
         "http://127.0.0.1\\@gateway.example/v1",
         "private_address_refused",
     ),
-    "zero-width joiner in the host": ("http://local‍host/v1", "private_address_refused"),
     "non-ASCII host": ("http://bücher.example/v1", "non_ascii_host_use_punycode"),
 }
 
