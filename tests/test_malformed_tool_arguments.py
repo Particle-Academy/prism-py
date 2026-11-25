@@ -654,3 +654,136 @@ def test_keeps_a_numeric_looking_key_as_a_name(arguments: str, no_network: None)
 
     assert call.has_malformed_arguments() is False
     assert call.decoded_arguments() == json.loads(arguments)
+
+
+UNUSABLE_RECORD_RAW = '{"kept-out": 5'
+
+
+def test_a_response_record_keeps_unusable_arguments_out(no_network: None) -> None:
+    transport = RecordingTransport("openai")
+    transport.body = {
+        "id": "r",
+        "model": "m",
+        "status": "completed",
+        "output": [
+            {
+                "type": "function_call",
+                "id": "fc_1",
+                "call_id": "call_1",
+                "name": "probe",
+                "arguments": UNUSABLE_RECORD_RAW,
+            }
+        ],
+        "usage": {"input_tokens": 1, "output_tokens": 1},
+    }
+
+    response = (
+        Prism.text()
+        .using("openai", "m", {"api_key": "k", "transport": transport})
+        .with_prompt("p")
+        .as_text()
+    )
+    # `raw` is the provider's body, kept as received; every record of the call is not.
+    record = {key: value for key, value in response.to_dict().items() if key != "raw"}
+    steps = [{k: v for k, v in step.items() if k != "raw"} for step in record.pop("steps")]
+
+    assert "kept-out" not in canonical.encode([record, steps])
+    assert record["tool_calls"][0] == {
+        "id": "fc_1",
+        "name": "probe",
+        "arguments": "]",
+        "arguments_malformed": True,
+        "result_id": "call_1",
+        "reasoning_id": None,
+        "reasoning_summary": None,
+    }
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [UNUSABLE_RECORD_RAW, "5", "[1,2]", '{"0":"x"}'],
+    ids=["truncated", "number", "list", "integer-key"],
+)
+def test_stores_unusable_arguments_as_the_reference_does(arguments: str) -> None:
+    record = AssistantMessage("", [ToolCall("c", "probe", arguments, "r")]).to_dict()
+
+    assert canonical.encode(record["tool_calls"]) == (
+        '[{"id":"c","name":"probe","arguments":"]","arguments_malformed":true,'
+        '"result_id":"r","reasoning_id":null,"reasoning_summary":null}]'
+    )
+
+    call = AssistantMessage.from_dict(json.loads(canonical.encode(record))).tool_calls[0]
+
+    assert call.has_malformed_arguments() is True
+    assert canonical.encode(call.to_dict()) == canonical.encode(record["tool_calls"][0])
+
+
+def test_stores_a_decoded_map_no_request_can_carry_as_unusable() -> None:
+    record = ToolCall("c", "probe", {"a": float("nan")}).to_dict()
+
+    assert record["arguments"] == "]"
+    assert record["arguments_malformed"] is True
+
+
+def test_reads_a_record_marked_unusable_as_unusable() -> None:
+    call = ToolCall.from_dict(
+        {"id": "c", "name": "probe", "arguments": {"city": "Paris"}, "arguments_malformed": True}
+    )
+
+    assert call.has_malformed_arguments() is True
+    assert call.to_dict()["arguments"] == "]"
+
+
+def test_stores_usable_arguments_as_before() -> None:
+    assert ToolCall("c", "probe", '{"city":"Paris"}').to_dict() == {
+        "id": "c",
+        "name": "probe",
+        "arguments": '{"city":"Paris"}',
+        "result_id": None,
+        "reasoning_id": None,
+        "reasoning_summary": None,
+    }
+    assert "arguments_malformed" not in ToolCall("c", "probe", {}).to_dict()
+
+
+def _at_stack_depth(depth: int, work: Any) -> Any:
+    """Run ``work`` with ``depth`` more frames on the call stack."""
+    if depth <= 0:
+        return work()
+    return _at_stack_depth(depth - 1, work)
+
+
+@pytest.mark.parametrize(
+    ("arguments", "malformed"),
+    [
+        ('{"a":' * 500 + "1" + "}" * 500, False),
+        ('{"a":' * 501 + "1" + "}" * 501, True),
+        ('{"a":' * 499 + '{"b":NaN}' + "}" * 499, True),
+        ('{"a":' * 499 + "[1,2]" + "}" * 499, False),
+    ],
+    ids=["depth-500", "depth-501", "deep-nan", "deep-list"],
+)
+def test_classifies_alike_at_any_caller_stack_depth(arguments: str, malformed: bool) -> None:
+    import sys
+
+    def classify() -> bool:
+        return ToolCall("c", "probe", arguments).has_malformed_arguments()
+
+    deep = sys.getrecursionlimit() - 60
+
+    assert classify() is malformed
+    assert _at_stack_depth(deep, classify) is malformed
+    assert _at_stack_depth(deep // 2, classify) is malformed
+
+
+def test_a_deep_caller_stack_reads_the_same_decoded_arguments() -> None:
+    import sys
+
+    arguments = '{"a":' * 500 + "1" + "}" * 500
+
+    shallow = ToolCall("c", "probe", arguments).decoded_arguments()
+    deep = _at_stack_depth(
+        sys.getrecursionlimit() - 60, lambda: ToolCall("c", "probe", arguments).decoded_arguments()
+    )
+
+    assert deep == shallow

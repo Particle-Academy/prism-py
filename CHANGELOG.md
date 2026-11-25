@@ -10,6 +10,8 @@ BREAKING CHANGE: A per-call provider `url` -- `using(provider, model, {"url": ..
 - The default transports follow an HTTP redirect only while it stays on the request's own scheme, host and port, as in the PHP reference and prism-ts. A redirect anywhere else, to a Location that is not a valid http(s) url, or to one carrying a user name or password, is refused with `PrismError` (`redirect_refused`) before anything is sent to it, so request headers are never re-sent to another origin; more than 10 hops is refused with `too_many_redirects`. A same-origin 307 or 308 keeps the method and body; a 303, or a 301/302 answering a POST, becomes a GET without a body. This applies to built-in and named compatible providers alike. A transport passed to a compatible provider is still asked not to follow redirects.
 - On chat completions, a user message carrying a document, audio or video part is refused with `unsupported_media`. The reference drops these parts without saying so.
 - A stream that ends without a finish reason reports `unknown`, not `stop`.
+- `ToolCall.to_dict()` no longer keeps the text of unusable arguments. Such a call is stored as `"arguments": "]"` with `"arguments_malformed": true`, as the PHP reference stores it, and `from_dict()` reads that record (or any record marked `arguments_malformed`) back as a call with unusable arguments. Records of usable calls are unchanged. This applies to every record holding a call: messages, steps and responses.
+- Whether a tool call's arguments are usable no longer depends on how deep the caller's stack is. Valid arguments nested 500 levels deep were refused when the call was classified from a deep stack, because decoding and encoding them ran out of recursion room.
 
 ## 0.11.0 — 2026-11-23
 

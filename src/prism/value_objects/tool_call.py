@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import math
 import re
-from collections.abc import Mapping
+import threading
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
-from typing import Any
+from typing import Any, TypeVar
 
 from prism import canonical
 from prism.errors import ErrorCode, PrismError
@@ -18,6 +19,12 @@ __all__ = ["ToolCall"]
 # envelope, and the reference encodes that request with a depth limit of 512, so
 # the limit leaves room for the deepest envelope.
 _MAX_ARGUMENT_DEPTH = 500
+
+# What a record holds in place of unusable arguments: text that is refused if the
+# record is ever read back into a call.
+_UNUSABLE_ARGUMENTS_RECORD = "]"
+
+_T = TypeVar("_T")
 
 _INTEGER_KEY = re.compile(r"0|-?[1-9][0-9]*", re.ASCII)
 
@@ -158,27 +165,25 @@ class ToolCall:
 
     def _decode(self, text: str) -> Any:
         try:
-            try:
-                decoded = json.loads(text, parse_constant=_refuse_constant)
-            except ValueError:
-                # Some providers (DeepSeek when streaming, notably) emit raw
-                # control characters inside string values, which RFC 8259
-                # requires to be escaped. Escape them in place — stripping them
-                # would corrupt intentional newlines and tabs — and decode again.
-                decoded = json.loads(
-                    _escape_control_characters_in_strings(text),
-                    parse_constant=_refuse_constant,
-                )
-        except (ValueError, RecursionError) as exc:
+            return _independent_of_caller_stack(lambda: _loads(text))
+        except (ValueError, RuntimeError) as exc:
+            # RuntimeError covers RecursionError, and a thread that could not start.
             raise PrismError.malformed_tool_call_arguments(self.name) from exc
 
-        return decoded
-
     def to_dict(self) -> dict[str, Any]:
+        """The stored record.
+
+        Unusable arguments are never kept: the record holds a fixed text that is
+        refused if it is ever read back into a call, and says so with
+        ``arguments_malformed``, as the reference does.
+        """
+        malformed = self.has_malformed_arguments()
+
         return {
             "id": self.id,
             "name": self.name,
-            "arguments": self.arguments,
+            "arguments": _UNUSABLE_ARGUMENTS_RECORD if malformed else self.arguments,
+            **({"arguments_malformed": True} if malformed else {}),
             "result_id": self.result_id,
             "reasoning_id": self.reasoning_id,
             "reasoning_summary": self.reasoning_summary,
@@ -186,14 +191,66 @@ class ToolCall:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> ToolCall:
+        # A record marked unusable stays unusable, whatever arguments it carries.
+        malformed = data.get("arguments_malformed") is True
+
         return cls(
             id=data["id"],
             name=data["name"],
-            arguments=data["arguments"],
+            arguments=_UNUSABLE_ARGUMENTS_RECORD if malformed else data["arguments"],
             result_id=data.get("result_id"),
             reasoning_id=data.get("reasoning_id"),
             reasoning_summary=data.get("reasoning_summary"),
         )
+
+
+def _loads(text: str) -> Any:
+    try:
+        return json.loads(text, parse_constant=_refuse_constant)
+    except ValueError:
+        # Some providers (DeepSeek when streaming, notably) emit raw control
+        # characters inside string values, which RFC 8259 requires to be
+        # escaped. Escape them in place — stripping them would corrupt
+        # intentional newlines and tabs — and decode again.
+        return json.loads(
+            _escape_control_characters_in_strings(text), parse_constant=_refuse_constant
+        )
+
+
+def _independent_of_caller_stack(work: Callable[[], _T]) -> _T:
+    """Run ``work`` so that its answer does not depend on the caller's stack depth.
+
+    The decoder and the encoder recurse once per nesting level, and Python
+    counts those levels against the same limit as the caller's own frames. A
+    caller already deep in its stack would otherwise see valid arguments refused
+    that a shallow caller sees accepted. When the first attempt runs out of
+    room, the work is done again on a new thread, whose stack starts empty, so
+    the answer is the one any caller gets. Input that is still too deep there is
+    too deep for every caller.
+    """
+    try:
+        return work()
+    except RecursionError:
+        pass
+
+    outcome: list[tuple[bool, Any]] = []
+
+    def run() -> None:
+        # Any failure is handed back and raised on the caller's thread.
+        try:
+            outcome.append((True, work()))
+        except BaseException as error:
+            outcome.append((False, error))
+
+    thread = threading.Thread(target=run, name="prism-tool-call-arguments", daemon=True)
+    thread.start()
+    thread.join()
+
+    succeeded, value = outcome[0]
+    if not succeeded:
+        raise value
+
+    return value  # type: ignore[no-any-return]
 
 
 def _refuse_constant(name: str) -> Any:
@@ -262,8 +319,9 @@ def _can_be_sent_back(root: dict[str, Any]) -> bool:
         depth += 1
 
     try:
-        canonical.encode(root)
-    except (TypeError, ValueError, RecursionError, PrismError):
+        _independent_of_caller_stack(lambda: canonical.encode(root))
+    except (TypeError, ValueError, RuntimeError, PrismError):
+        # RuntimeError covers RecursionError, and a thread that could not start.
         return False
 
     return True
