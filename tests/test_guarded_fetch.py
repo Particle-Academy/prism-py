@@ -338,6 +338,11 @@ NON_PUBLIC = [
     "ff02::1",
     "::ffff:7f00:1",
     "::7f00:1",
+    "2002:808:808::5efe:7f00:1",
+    "2002:808:808::5efe:169.254.169.254",
+    "2002:808:808::200:5efe:a9fe:a9fe",
+    "2001:4860::5efe:10.0.0.5",
+    "2606:4700::5efe:127.0.0.1",
 ]
 
 
@@ -365,7 +370,16 @@ def test_non_public_dns_answer_is_refused(address: str) -> None:
 # The controls. An IPv6-only host behind DNS64 is TOLD 64:ff9b:: addresses for
 # public sites, so refusing NAT64 outright would break every fetch there.
 @pytest.mark.parametrize(
-    "address", ["8.8.8.8", "64:ff9b::808:808", "2002:808:808::1", "2606:4700:4700::1111"]
+    "address",
+    [
+        "8.8.8.8",
+        "64:ff9b::808:808",
+        "2002:808:808::1",
+        "2606:4700:4700::1111",
+        "2606:4700::8.8.8.8",
+        "2606:4700::5efe:8.8.8.8",
+        "2002:808:808::5efe:808:808",
+    ],
 )
 def test_public_answers_still_fetch_including_nat64_and_6to4(address: str) -> None:
     transport, resolver = FakeTransport(), Resolver([address])

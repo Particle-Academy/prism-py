@@ -218,6 +218,9 @@ def assert_per_call_url(url: str) -> None:
         raise _scheme()
     if written is None or not _WRITTEN_HOST.match(written):
         raise _host()
+    # An address literal has no trailing dot; only a name does.
+    if written.endswith(".]"):
+        raise _host()
     if _INVISIBLE.search(_authority(url)):
         raise _host()
     if not written.isascii():
