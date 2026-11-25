@@ -143,7 +143,7 @@ def test_a_failed_start_reports_the_provider_message() -> None:
 
 ANTHROPIC_SSE = [
     'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_1",'
-    '"model":"claude-sonnet-4-5","usage":{"input_tokens":7,"output_tokens":0}}}\n\n',
+    '"model":"claude-sonnet-5-5","usage":{"input_tokens":7,"output_tokens":0}}}\n\n',
     'event: content_block_start\ndata: {"type":"content_block_start","index":0,'
     '"content_block":{"type":"text","text":""}}\n\n',
     'data: {"type":"ping"}\n\n',
@@ -158,7 +158,7 @@ ANTHROPIC_SSE = [
 def _anthropic_stream(chunks: list[str], status: int = 200) -> Iterator[Any]:
     transport = RecordingStreamTransport(chunks, status)
     pending = Prism.text().using(
-        "anthropic", "claude-sonnet-4-5", {"api_key": "sk-test", "stream_transport": transport}
+        "anthropic", "claude-sonnet-5-5", {"api_key": "sk-test", "stream_transport": transport}
     )
     return pending.with_prompt("Hi").as_stream()
 
