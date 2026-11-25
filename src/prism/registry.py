@@ -175,7 +175,8 @@ def _check_per_call_url(url: str, policy: _UrlPolicy) -> None:
     """Refuse a per-call url that chooses a private address.
 
     Exempt: the url is the provider's configured endpoint (the call is not
-    choosing a new address), or the opt-out is on in CONFIG. A per-call
+    choosing a new address). The opt-out in CONFIG allows a private address
+    but not another scheme or a host that cannot be read. A per-call
     ``allow_private_per_call_url`` key is never read.
     """
     if policy.validate is not None:
@@ -183,9 +184,7 @@ def _check_per_call_url(url: str, policy: _UrlPolicy) -> None:
     configured = policy.configured_url()
     if configured is not None and same_endpoint(url, configured):
         return
-    if policy.allow_private():
-        return
-    assert_per_call_url(url)
+    assert_per_call_url(url, allow_private=policy.allow_private())
 
 
 def _url_policy(key: str, factory: ProviderFactory) -> _UrlPolicy:

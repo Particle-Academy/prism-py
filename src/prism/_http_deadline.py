@@ -125,7 +125,10 @@ class NetworkDeadline:
                 remaining = min(remaining, seconds) if remaining is not None else seconds
             return remaining
 
-        if self.pinned_addresses is not None and host.lower() == (self.pinned_host or "").lower():
+        if self.pinned_addresses is not None and host.lower() != (self.pinned_host or "").lower():
+            # A pinned request connects only to the host it was checked for.
+            raise OSError("A pinned request may connect only to the host it was checked for.")
+        if self.pinned_addresses is not None:
             records = []
             for value in self.pinned_addresses:
                 parsed = ipaddress.ip_address(value)

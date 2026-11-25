@@ -295,7 +295,9 @@ the call is not choosing a new address. A custom provider from
 `register_provider()` has no configured url, so every per-call url it is given
 is checked.
 
-To let calls choose a private address, opt in in config. It is off by default,
+To let calls choose a private address, opt in in config. The opt-out admits
+private addresses only: the scheme, host-character, invisible-character and
+ASCII rules above still apply. It is off by default,
 and a per-call `allow_private_per_call_url` key is ignored:
 
 | Provider | Opt-out |

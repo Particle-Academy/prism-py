@@ -533,8 +533,10 @@ def test_the_default_transports_send_only_http_and_https(
 
 
 def test_a_url_urllib_cannot_parse_is_refused_without_echoing_it(lookups: list[str]) -> None:
-    for url in (f"{USER}:{PASSWORD}@gateway.example/v1", f"//{USER}@gateway.example/v1"):
-        error = _attempt(lambda url=url: UrllibTransport().send(HttpRequest("POST", url)))
+    urls = (f"{USER}:{PASSWORD}@gateway.example/v1", f"//{USER}@gateway.example/v1")
+    calls = (UrllibTransport().send, UrllibStreamTransport().stream)
+    for url, call in ((url, call) for url in urls for call in calls):
+        error = _attempt(lambda url=url, call=call: call(HttpRequest("POST", url)))
         assert isinstance(error, PrismError), url
         assert error.code == "scheme_not_allowed"
         assert USER not in str(error) and PASSWORD not in str(error)

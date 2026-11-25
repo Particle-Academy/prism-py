@@ -258,6 +258,10 @@ USERINFO_MESSAGE = (
     "The url carries userinfo (a user name or password before the host), which the"
     " default transport cannot send; pass credentials in the provider config instead."
 )
+ESCAPED_HOST_MESSAGE = (
+    "The url's host is written with percent escapes, which the default transport would"
+    " decode before connecting, so it did not send it."
+)
 SCHEME_MESSAGE = (
     "The url is not an absolute http or https url, so the default transport did not send it."
 )
@@ -295,6 +299,10 @@ def _urllib_request(request: HttpRequest) -> urllib.request.Request:
         raise PrismError(ErrorCode.SCHEME_NOT_ALLOWED, SCHEME_MESSAGE)
     if "@" in raw.host or "@" in unquote(raw.host):
         raise PrismError(ErrorCode.SCHEME_NOT_ALLOWED, USERINFO_MESSAGE)
+    # urllib percent-decodes the host it read; anything that checked the url as
+    # written (a pin, a guard) would then judge a different host.
+    if raw.host != urlsplit(raw.full_url).netloc:
+        raise PrismError(ErrorCode.SCHEME_NOT_ALLOWED, ESCAPED_HOST_MESSAGE)
     return raw
 
 

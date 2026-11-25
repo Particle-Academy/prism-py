@@ -130,6 +130,15 @@ def assert_public_url(url: str, resolver: HostResolver) -> tuple[str, ...]:
         raise PrismError(
             ErrorCode.SCHEME_NOT_ALLOWED, "A guarded fetch needs an absolute http or https URL."
         ) from None
+    # urllib percent-decodes the host before it connects, and URL parsers split
+    # a backslash in different places, so a host holding either would be
+    # checked as one name and contacted as another.
+    authority = parsed.netloc.rpartition("@")[2]
+    if "%" in authority or "\\" in authority:
+        raise PrismError(
+            ErrorCode.PRIVATE_ADDRESS_REFUSED,
+            "A guarded fetch refuses a host written with escapes or a backslash.",
+        )
     try:
         ipaddress.ip_address(host)
     except ValueError:

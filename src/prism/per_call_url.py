@@ -199,8 +199,13 @@ def _written_host(url: str) -> str | None:
     return host_port.partition(":")[0]
 
 
-def assert_per_call_url(url: str) -> None:
+def assert_per_call_url(url: str, *, allow_private: bool = False) -> None:
     """Refuse ``url`` when its host is a non-public address or a local name.
+
+    ``allow_private=True`` (the provider config's opt-out) skips only the
+    address and local-name rules. The scheme, the host as written, invisible
+    characters and the ASCII rule hold either way: the opt-out lets a call name
+    a private address, never another scheme or a host that cannot be read.
 
     :raises PrismError: ``scheme_not_allowed`` for a url that is not absolute
         http/https with a host; ``private_address_refused`` for a loopback,
@@ -246,6 +251,8 @@ def assert_per_call_url(url: str) -> None:
     # The written host was ASCII, so anything else here is a parser surprise.
     if not _CANONICAL_HOST.match(host):
         raise _host()
+    if allow_private:
+        return
 
     # 5. IPv6 literal.
     if ":" in host:
