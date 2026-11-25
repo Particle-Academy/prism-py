@@ -104,7 +104,17 @@ def test_public_literal_fetches_without_dns(url: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "target", ["http://169.254.169.254/x", "//127.0.0.1/x", "file:///etc/passwd", "http://[bad]/x"]
+    "target",
+    [
+        "http://169.254.169.254/x",
+        "//127.0.0.1/x",
+        "file:///etc/passwd",
+        "http://[bad]/x",
+        # Corpus url-0022 (G-366): loopback in a dotted IPv4 tail behind an
+        # ISATAP interface identifier, reached by a redirect hop.
+        "http://[2606:4700::5efe:127.0.0.1]/x.png",
+        "http://[2002:808:808::5efe:169.254.169.254]/latest/meta-data/",
+    ],
 )
 def test_redirect_is_checked_before_target_request(target: str) -> None:
     transport = FakeTransport([HttpResponse(302, b"", {"Location": target})])

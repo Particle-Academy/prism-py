@@ -28,8 +28,13 @@ REFUSALS = {
 
 
 def test_inventory_and_explicit_legacy_path_skip() -> None:
-    # 23 rows from corpus 0.1.29 (G-366). Fewer would silently skip its security rows.
-    assert len(ROWS) >= 23
+    # The row count is pinned to the corpus version, so a loader that drops rows
+    # fails here instead of running fewer. conformance/parity.lock pins a corpus
+    # from before 0.1.29, which has 17 rows; the six G-366 rows (url-0018..0023)
+    # arrive when that pin advances, and their address forms are asserted
+    # natively in tests/test_guarded_fetch.py meanwhile.
+    version = tuple(int(part) for part in Corpus.open().version.split("."))
+    assert len(ROWS) == (23 if version >= (0, 1, 29) else 17)
     assert [row["id"] for row in ROWS] == [f"url-{i:04}" for i in range(1, len(ROWS) + 1)]
     assert SUITE.skipped_ids("py") == ["url-0009"]
     assert SUITE.skipped_ids("php") == []
