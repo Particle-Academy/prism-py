@@ -51,7 +51,9 @@ def test_inventory_and_explicit_legacy_path_skip() -> None:
     for row in WIRE_ROWS:
         assert row["url"].count("{port}") == 1
         assert row.get("guarded", True) is True or "py" in row.get("skip", {})
-    assert [i for i in SUITE.skipped_ids("py") if i not in {row["id"] for row in WIRE_ROWS}] == ["url-0009"]
+    assert [i for i in SUITE.skipped_ids("py") if i not in {row["id"] for row in WIRE_ROWS}] == [
+        "url-0009"
+    ]
     assert SUITE.skipped_ids("php") == []
     assert SUITE.skipped_ids("ts") == []
     skipped = next(row for row in ROWS if row["id"] == "url-0009")
