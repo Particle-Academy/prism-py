@@ -71,7 +71,7 @@ def test_stream_trace_json_survives_ascii_stdout() -> None:
         "0.1.22": 21,
         "0.1.23": 21,
         "0.1.24": 21,
-        # 0.1.25..0.1.43 add or change security-corpus rows, value-object-roundtrip
+        # 0.1.25..0.1.44 add or change security-corpus rows, value-object-roundtrip
         # rows and probe declarations; anthropic-text-stream is unchanged.
         "0.1.25": 21,
         "0.1.26": 21,
@@ -92,6 +92,7 @@ def test_stream_trace_json_survives_ascii_stdout() -> None:
         "0.1.41": 21,
         "0.1.42": 21,
         "0.1.43": 21,
+        "0.1.44": 21,
     }.get(document["corpus_version"])
     assert all(row["status"] == "pass" for row in document["results"])
     trace = json.loads(document["results"][0]["trace_comparison"]["actual"])

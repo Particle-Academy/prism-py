@@ -17,7 +17,7 @@ except ImportError as error:
 
 SUITE = Corpus.open().suite("media-fetch-guard")
 ALL_ROWS = SUITE.cases("py")
-# A `transport: default` row (corpus 0.1.43, G-386) names `{port}` and is
+# A `transport: default` row (corpus 0.1.44, G-386) names `{port}` and is
 # fetched over the REAL default transport against a loopback server, reading
 # what arrived off the server: prism-parity's tools/media-fetch-guard.mjs runs
 # those against this repository's default branch. A fake transport here
@@ -46,7 +46,7 @@ def test_inventory_and_explicit_legacy_path_skip() -> None:
     assert len(ROWS) == (23 if version >= (0, 1, 29) else 17)
     assert [row["id"] for row in ALL_ROWS] == [f"url-{i:04}" for i in range(1, len(ALL_ROWS) + 1)]
     assert all(row.get("transport") in (None, WIRE) for row in ALL_ROWS)
-    # Wire rows follow the 23 transport-free rows; none before corpus 0.1.43.
+    # Wire rows follow the 23 transport-free rows; none before corpus 0.1.44.
     assert not WIRE_ROWS or len(ROWS) == 23
     for row in WIRE_ROWS:
         assert row["url"].count("{port}") == 1
