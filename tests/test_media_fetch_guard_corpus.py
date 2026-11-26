@@ -16,7 +16,16 @@ except ImportError as error:
     ) from error
 
 SUITE = Corpus.open().suite("media-fetch-guard")
-ROWS = SUITE.cases("py")
+ALL_ROWS = SUITE.cases("py")
+# A `transport: default` row (corpus 0.1.44, G-386) names `{port}` and is
+# fetched over the REAL default transport against a loopback server, reading
+# what arrived off the server: prism-parity's tools/media-fetch-guard.mjs runs
+# those against this repository's default branch. A fake transport here
+# records what the guard decided, not where the client would have connected,
+# which is the blind spot the wire rows close. Every other row runs here.
+WIRE = "default"
+ROWS = [row for row in ALL_ROWS if row.get("transport") != WIRE]
+WIRE_ROWS = [row for row in ALL_ROWS if row.get("transport") == WIRE]
 CONTENT = b"public image bytes"
 REFUSALS = {
     ErrorCode.SCHEME_NOT_ALLOWED,
@@ -35,8 +44,16 @@ def test_inventory_and_explicit_legacy_path_skip() -> None:
     # natively in tests/test_guarded_fetch.py meanwhile.
     version = tuple(int(part) for part in Corpus.open().version.split("."))
     assert len(ROWS) == (23 if version >= (0, 1, 29) else 17)
-    assert [row["id"] for row in ROWS] == [f"url-{i:04}" for i in range(1, len(ROWS) + 1)]
-    assert SUITE.skipped_ids("py") == ["url-0009"]
+    assert [row["id"] for row in ALL_ROWS] == [f"url-{i:04}" for i in range(1, len(ALL_ROWS) + 1)]
+    assert all(row.get("transport") in (None, WIRE) for row in ALL_ROWS)
+    # Wire rows follow the 23 transport-free rows; none before corpus 0.1.44.
+    assert not WIRE_ROWS or len(ROWS) == 23
+    for row in WIRE_ROWS:
+        assert row["url"].count("{port}") == 1
+        assert row.get("guarded", True) is True or "py" in row.get("skip", {})
+    assert [i for i in SUITE.skipped_ids("py") if i not in {row["id"] for row in WIRE_ROWS}] == [
+        "url-0009"
+    ]
     assert SUITE.skipped_ids("php") == []
     assert SUITE.skipped_ids("ts") == []
     skipped = next(row for row in ROWS if row["id"] == "url-0009")
